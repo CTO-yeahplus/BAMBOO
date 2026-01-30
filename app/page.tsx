@@ -1,5 +1,3 @@
-// app/page.tsx (전체 업데이트)
-
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
@@ -11,7 +9,7 @@ import Vapi from '@vapi-ai/web';
 const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || '';
 const ASSISTANT_ID = process.env.NEXT_PUBLIC_ASSISTANT_ID || '';
 
-// --- 배경 그라디언트 ---
+// --- 배경 그라디언트 색상 ---
 const BACKGROUND_COLORS = {
   default: ['from-gray-900', 'via-[#051a05]', 'to-black'],
   loneliness: ['from-blue-950', 'via-indigo-950', 'to-black'],
@@ -34,23 +32,24 @@ interface Particle {
 }
 
 export default function BambooForest() {
+  // 1. 상태 관리
   const [callStatus, setCallStatus] = useState<'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'processing'>('idle');
   const [currentEmotion, setCurrentEmotion] = useState<keyof typeof BACKGROUND_COLORS>('default');
   const [isMounted, setIsMounted] = useState(false);
 
+  // 2. 애니메이션 값
   const volumeMotion = useMotionValue(0);
   const springVolume = useSpring(volumeMotion, { stiffness: 300, damping: 30 });
   
-  // Framer Motion 변환 값
   const blurValue = useTransform(springVolume, (v) => `blur(${(1 - v) * 10}px)`);
   const opacityValue = useTransform(springVolume, (v) => 1 - v);
   const barWidth = useTransform(springVolume, (v) => `${v * 100}%`);
 
+  // 3. Refs
   const vapiRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null); // [추가] 침묵 타이머
 
-  // 파티클 초기화
+  // 4. 파티클 초기화
   const particles = useMemo<Particle[]>(() => 
     Array.from({ length: PARTICLE_COUNT }).map((_, i) => ({
       id: i,
@@ -61,31 +60,10 @@ export default function BambooForest() {
       delay: Math.random() * 10,
     })), []);
 
-  // [추가] 침묵 감지 및 정령의 선제 대화 함수
-  const startSilenceTimer = useCallback(() => {
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-    
-    silenceTimerRef.current = setTimeout(() => {
-      // 10초간 침묵 시 실행
-      if (vapiRef.current && callStatus === 'listening') {
-        console.log("🍃 Silence detected. Spirit speaks.");
-        // Vapi에게 강제로 말하게 시킴 (대화 유도)
-        vapiRef.current.send({
-          type: "add-message",
-          message: {
-            role: "system",
-            content: "사용자가 10초 동안 아무 말이 없습니다. '무슨 생각 해?' 혹은 '편하게 숨 쉬어도 돼'라고 짧게 말을 걸어주세요."
-          }
-        });
-      }
-    }, 12000); // 12초
-  }, [callStatus]);
-
+  // 5. Vapi 이벤트 핸들러
   const handleVapiEvents = useCallback((vapiInstance: any) => {
     vapiInstance.on('call-start', () => {
       setCallStatus('active');
-      startSilenceTimer(); // [추가] 통화 시작 시 타이머 가동
-
       if (audioRef.current) {
         audioRef.current.volume = 0;
         audioRef.current.play().then(() => {
@@ -98,35 +76,25 @@ export default function BambooForest() {
       setCallStatus('idle');
       volumeMotion.set(0);
       setCurrentEmotion('default');
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current); // [추가] 타이머 정리
       if (audioRef.current) audioRef.current.pause();
     });
 
     vapiInstance.on('volume-level', (volume: number) => {
+      // 말할 때 시각적 반응
       volumeMotion.set(Math.min(volume * 2.5, 1));
     });
 
-    // [수정] 사용자가 말을 시작하면 타이머 리셋
+    // 사용자가 말을 시작하면 -> 'listening' 상태로 전환 (이때 AI가 말을 멈춰야 함)
     vapiInstance.on('speech-start', () => {
       setCallStatus('listening');
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     });
 
-    // [수정] 사용자가 말을 끝내면 타이머는 멈춤 (AI가 대답할 차례니까)
     vapiInstance.on('speech-end', () => setCallStatus('processing'));
-    
     vapiInstance.on('assistant-speech-start', () => setCallStatus('speaking'));
-    
-    // [수정] AI가 말을 끝내면 다시 침묵 타이머 시작
-    vapiInstance.on('assistant-speech-end', () => {
-      setCallStatus('active'); // active 상태가 곧 listening 대기 상태
-      startSilenceTimer();
-    });
+    vapiInstance.on('assistant-speech-end', () => setCallStatus('active'));
 
     vapiInstance.on('error', (e: any) => {
-      // 에러 로그는 남기되, 사용자에게는 티내지 않음
-      console.error('Vapi Web SDK Warning:', JSON.stringify(e, null, 2));
-      // WASM 에러는 무시하고 상태만 유지 (필요 시 idle로 전환)
+      console.error('Vapi Error:', JSON.stringify(e, null, 2));
     });
 
     vapiInstance.on('structured-output', (output: { type: string; value: any }) => {
@@ -134,13 +102,12 @@ export default function BambooForest() {
         const category = output.value as string;
         if (Object.keys(BACKGROUND_COLORS).includes(category.toLowerCase())) {
           setCurrentEmotion(category.toLowerCase() as keyof typeof BACKGROUND_COLORS);
-        } else {
-          setCurrentEmotion('default');
         }
       }
     });
-  }, [volumeMotion, startSilenceTimer]);
+  }, [volumeMotion]);
 
+  // 6. 초기화
   useEffect(() => {
     setIsMounted(true);
     if (!VAPI_PUBLIC_KEY) return;
@@ -150,25 +117,27 @@ export default function BambooForest() {
     handleVapiEvents(vapi);
 
     return () => {
-      // [수정] 안전한 종료 처리
       try {
         vapi.stop();
         vapi.removeAllListeners();
       } catch (e) {
-        console.warn("Cleanup warning:", e);
+        // Cleanup error ignore
       }
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     };
   }, [handleVapiEvents]);
 
+  // 7. 통화 제어
   const toggleCall = () => {
     if (callStatus === 'idle') {
       if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10); 
       setCallStatus('connecting');
+      // [중요] ID 문자열만 전달
       vapiRef.current?.start(ASSISTANT_ID); 
     } else {
+      console.log("🔴 Stopping call...");
       if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10); 
       vapiRef.current?.stop();
+      setTimeout(() => setCallStatus('idle'), 500);
     }
   };
 
@@ -176,7 +145,7 @@ export default function BambooForest() {
     switch (callStatus) {
       case 'connecting': return "Connecting...";
       case 'active': return "Here with you";
-      case 'listening': return "Listening...";
+      case 'listening': return "Listening..."; // 사용자가 말하는 중
       case 'processing': return "Thinking...";
       case 'speaking': return "Speaking...";
       case 'idle': return "Enter the forest";
@@ -197,7 +166,7 @@ export default function BambooForest() {
       {isMounted && particles.map((p) => (
         <motion.div
           key={p.id}
-          className="absolute bg-white/30 rounded-full"
+          className="absolute bg-white/30 rounded-full pointer-events-none"
           style={{ 
             width: p.size, 
             height: p.size, 
@@ -221,7 +190,7 @@ export default function BambooForest() {
       ))}
 
       <motion.div
-        className="relative z-10 w-[280px] h-[380px] md:w-[400px] md:h-[550px] rounded-[40px] overflow-hidden"
+        className="relative z-10 w-[280px] h-[380px] md:w-[400px] md:h-[550px] rounded-[40px] overflow-hidden pointer-events-none"
         style={{ scale: useSpring(useMotionValue(1), { stiffness: 100 }) }}
         animate={{
           scale: 1 + (callStatus !== 'idle' ? 0.05 : 0),
@@ -232,11 +201,18 @@ export default function BambooForest() {
           className="absolute inset-0 z-20 pointer-events-none"
           style={{ backdropFilter: blurValue, opacity: opacityValue }}
         />
-        <Image src="/images/spirit_forrest.png" alt="Bamboo Spirit" fill className="object-cover" priority />
+        <Image 
+          src="/images/spirit_final.png" 
+          alt="Bamboo Spirit" 
+          fill
+          className="object-cover"
+          priority
+          sizes="(max-width: 768px) 100vw, 50vw"
+        />
         <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-white/5 to-white/10 mix-blend-overlay" />
       </motion.div>
 
-      <div className="absolute bottom-20 z-30 flex flex-col items-center gap-8">
+      <div className="absolute bottom-20 z-50 flex flex-col items-center gap-8 w-full pointer-events-none">
         <AnimatePresence mode="wait">
           {callStatus === 'idle' ? (
             <motion.button
@@ -247,7 +223,7 @@ export default function BambooForest() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.98 }}
               onClick={toggleCall}
-              className="px-10 py-5 text-sm font-medium text-white bg-white/5 border border-white/10 rounded-full backdrop-blur-2xl shadow-2xl hover:bg-white/10 transition-all tracking-widest"
+              className="pointer-events-auto px-10 py-5 text-sm font-medium text-white bg-white/5 border border-white/10 rounded-full backdrop-blur-2xl shadow-2xl hover:bg-white/10 transition-all tracking-widest cursor-pointer"
             >
               숲으로 입장하기
             </motion.button>
@@ -256,14 +232,15 @@ export default function BambooForest() {
               key="active-status"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center gap-6"
+              className="flex flex-col items-center gap-6 pointer-events-auto"
             >
               <button 
                 onClick={toggleCall}
-                className="group p-5 rounded-full bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-500/40 transition-all duration-500"
+                className="group relative z-50 p-6 rounded-full bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-500/40 transition-all duration-300 cursor-pointer active:scale-90"
               >
-                <motion.div animate={{ rotate: callStatus === 'connecting' ? 0 : 90 }}>
-                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                 <span className="sr-only">End Call</span>
+                 <motion.div animate={{ rotate: callStatus === 'connecting' ? 0 : 90 }}>
+                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-white/80 group-hover:text-red-200">
                     <path d="M18 6L6 18M6 6l12 12" />
                   </svg>
                 </motion.div>
