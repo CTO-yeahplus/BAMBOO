@@ -5,13 +5,21 @@ import Image from 'next/image';
 import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
 // @ts-ignore
 import Vapi from '@vapi-ai/web';
+import { v4 as uuidv4 } from 'uuid';
 
 const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || '';
 const ASSISTANT_ID = process.env.NEXT_PUBLIC_ASSISTANT_ID || '';
 
-// --- 배경 그라디언트 색상 ---
-const BACKGROUND_COLORS = {
-  default: ['from-gray-900', 'via-[#051a05]', 'to-black'],
+// --- [Step 1] 시간대별 배경 테마 정의 ---
+const TIME_THEMES = {
+  dawn: ['from-slate-900', 'via-purple-900', 'to-black'],      // 새벽 (05~07)
+  day: ['from-sky-900', 'via-emerald-900', 'to-black'],        // 낮 (07~17)
+  sunset: ['from-orange-950', 'via-red-950', 'to-black'],      // 노을 (17~20)
+  night: ['from-gray-900', 'via-[#051a05]', 'to-black'],       // 밤 (20~05)
+};
+
+// 감정별 배경 (감정이 감지되면 시간보다 우선됨)
+const EMOTION_COLORS = {
   loneliness: ['from-blue-950', 'via-indigo-950', 'to-black'],
   anger: ['from-red-950', 'via-orange-950', 'to-black'],
   sadness: ['from-purple-950', 'via-blue-950', 'to-black'],
@@ -20,8 +28,7 @@ const BACKGROUND_COLORS = {
   work: ['from-zinc-950', 'via-slate-950', 'to-black'],
 };
 
-const PARTICLE_COUNT = 20;
-
+// 파티클 인터페이스
 interface Particle {
   id: number;
   x: number;
@@ -32,26 +39,26 @@ interface Particle {
 }
 
 export default function BambooForest() {
-  // 1. 상태 관리
+  // --- 상태 관리 ---
   const [callStatus, setCallStatus] = useState<'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'processing'>('idle');
-  const [currentEmotion, setCurrentEmotion] = useState<keyof typeof BACKGROUND_COLORS>('default');
+  const [backgroundGradient, setBackgroundGradient] = useState<string[]>(TIME_THEMES.night); // 초기값은 밤
   const [isMounted, setIsMounted] = useState(false);
+  const [spiritMessage, setSpiritMessage] = useState<string | null>(null); // [Step 2] 정령의 편지 메시지
+  const [userId, setUserId] = useState<string>(''); // [추가] 사용자 ID
 
-  // 2. 애니메이션 값
+  // --- 애니메이션 값 ---
   const volumeMotion = useMotionValue(0);
   const springVolume = useSpring(volumeMotion, { stiffness: 300, damping: 30 });
-  
   const blurValue = useTransform(springVolume, (v) => `blur(${(1 - v) * 10}px)`);
   const opacityValue = useTransform(springVolume, (v) => 1 - v);
   const barWidth = useTransform(springVolume, (v) => `${v * 100}%`);
 
-  // 3. Refs
   const vapiRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // 4. 파티클 초기화
+  // --- 파티클 초기화 ---
   const particles = useMemo<Particle[]>(() => 
-    Array.from({ length: PARTICLE_COUNT }).map((_, i) => ({
+    Array.from({ length: 20 }).map((_, i) => ({
       id: i,
       x: Math.random() * 100,
       y: Math.random() * 100,
@@ -60,10 +67,24 @@ export default function BambooForest() {
       delay: Math.random() * 10,
     })), []);
 
-  // 5. Vapi 이벤트 핸들러
+  // --- [Step 1] 시간대 체크 함수 ---
+  const checkTimeOfDay = useCallback(() => {
+    const hour = new Date().getHours();
+    let theme = TIME_THEMES.night;
+
+    if (hour >= 5 && hour < 7) theme = TIME_THEMES.dawn;
+    else if (hour >= 7 && hour < 17) theme = TIME_THEMES.day;
+    else if (hour >= 17 && hour < 20) theme = TIME_THEMES.sunset;
+    else theme = TIME_THEMES.night;
+
+    setBackgroundGradient(theme);
+  }, []);
+
+  // --- Vapi 이벤트 핸들러 ---
   const handleVapiEvents = useCallback((vapiInstance: any) => {
     vapiInstance.on('call-start', () => {
       setCallStatus('active');
+      setSpiritMessage(null); // 통화 시작하면 메시지 초기화
       if (audioRef.current) {
         audioRef.current.volume = 0;
         audioRef.current.play().then(() => {
@@ -75,20 +96,25 @@ export default function BambooForest() {
     vapiInstance.on('call-end', () => {
       setCallStatus('idle');
       volumeMotion.set(0);
-      setCurrentEmotion('default');
+      checkTimeOfDay(); // 통화 끝나면 다시 시간 기반 배경으로 복귀
       if (audioRef.current) audioRef.current.pause();
+
+      // [Step 2] 통화 종료 시 감성 메시지 출력 (랜덤 혹은 분석 기반)
+      const messages = [
+        "바람이 짐을 가져갔기를...",
+        "언제든 다시 찾아와. 숲은 여기 있으니까.",
+        "오늘 밤은 편안하게 잠들 거야.",
+        "너는 혼자가 아니야.",
+        "깊은 숨을 쉬어봐. 숲의 향기가 날 거야."
+      ];
+      setSpiritMessage(messages[Math.floor(Math.random() * messages.length)]);
     });
 
     vapiInstance.on('volume-level', (volume: number) => {
-      // 말할 때 시각적 반응
       volumeMotion.set(Math.min(volume * 2.5, 1));
     });
 
-    // 사용자가 말을 시작하면 -> 'listening' 상태로 전환 (이때 AI가 말을 멈춰야 함)
-    vapiInstance.on('speech-start', () => {
-      setCallStatus('listening');
-    });
-
+    vapiInstance.on('speech-start', () => setCallStatus('listening'));
     vapiInstance.on('speech-end', () => setCallStatus('processing'));
     vapiInstance.on('assistant-speech-start', () => setCallStatus('speaking'));
     vapiInstance.on('assistant-speech-end', () => setCallStatus('active'));
@@ -97,21 +123,31 @@ export default function BambooForest() {
       console.error('Vapi Error:', JSON.stringify(e, null, 2));
     });
 
+    // 감정 분석 결과에 따라 배경 변경
     vapiInstance.on('structured-output', (output: { type: string; value: any }) => {
       if (output.type === 'primary_struggle_category') {
         const category = output.value as string;
-        if (Object.keys(BACKGROUND_COLORS).includes(category.toLowerCase())) {
-          setCurrentEmotion(category.toLowerCase() as keyof typeof BACKGROUND_COLORS);
+        if (Object.keys(EMOTION_COLORS).includes(category.toLowerCase())) {
+          setBackgroundGradient(EMOTION_COLORS[category.toLowerCase() as keyof typeof EMOTION_COLORS]);
         }
       }
     });
-  }, [volumeMotion]);
+  }, [volumeMotion, checkTimeOfDay]);
 
-  // 6. 초기화
+  // --- 초기화 ---
   useEffect(() => {
     setIsMounted(true);
+    checkTimeOfDay();
+
+    // [추가] 사용자 ID 로드 또는 생성 (브라우저에 영구 저장)
+    let storedUserId = localStorage.getItem('bamboo_user_id');
+    if (!storedUserId) {
+      storedUserId = uuidv4();
+      localStorage.setItem('bamboo_user_id', storedUserId);
+    }
+    setUserId(storedUserId);
+
     if (!VAPI_PUBLIC_KEY) return;
-    
     const vapi = new Vapi(VAPI_PUBLIC_KEY);
     vapiRef.current = vapi;
     handleVapiEvents(vapi);
@@ -120,21 +156,21 @@ export default function BambooForest() {
       try {
         vapi.stop();
         vapi.removeAllListeners();
-      } catch (e) {
-        // Cleanup error ignore
-      }
+      } catch (e) {}
     };
-  }, [handleVapiEvents]);
+  }, [handleVapiEvents, checkTimeOfDay]);
 
-  // 7. 통화 제어
+  // --- 통화 제어 ---
   const toggleCall = () => {
     if (callStatus === 'idle') {
       if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10); 
       setCallStatus('connecting');
-      // [중요] ID 문자열만 전달
-      vapiRef.current?.start(ASSISTANT_ID); 
+      vapiRef.current?.start(ASSISTANT_ID, {
+        metadata: {
+          userId: userId 
+        }
+      });
     } else {
-      console.log("🔴 Stopping call...");
       if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10); 
       vapiRef.current?.stop();
       setTimeout(() => setCallStatus('idle'), 500);
@@ -145,7 +181,7 @@ export default function BambooForest() {
     switch (callStatus) {
       case 'connecting': return "Connecting...";
       case 'active': return "Here with you";
-      case 'listening': return "Listening..."; // 사용자가 말하는 중
+      case 'listening': return "Listening...";
       case 'processing': return "Thinking...";
       case 'speaking': return "Speaking...";
       case 'idle': return "Enter the forest";
@@ -157,21 +193,20 @@ export default function BambooForest() {
     <main className="relative flex flex-col items-center justify-center w-full h-screen overflow-hidden bg-black touch-none">
       <audio ref={audioRef} src="/sounds/forest_ambience.mp3" loop />
       
+      {/* 배경 레이어 (동적 그라디언트) */}
       <motion.div 
-        className={`absolute inset-0 bg-gradient-to-b ${BACKGROUND_COLORS[currentEmotion].join(' ')}`}
+        className={`absolute inset-0 bg-gradient-to-b ${backgroundGradient.join(' ')}`}
         animate={{ opacity: callStatus === 'idle' ? 0.7 : 1 }}
         transition={{ duration: 2.5 }}
       />
 
+      {/* 파티클 레이어 */}
       {isMounted && particles.map((p) => (
         <motion.div
           key={p.id}
           className="absolute bg-white/30 rounded-full pointer-events-none"
           style={{ 
-            width: p.size, 
-            height: p.size, 
-            left: `${p.x}%`, 
-            top: `${p.y}%`,
+            width: p.size, height: p.size, left: `${p.x}%`, top: `${p.y}%`,
             filter: `blur(${p.size / 2}px)`
           }}
           animate={{
@@ -180,15 +215,11 @@ export default function BambooForest() {
             opacity: [0, 1, 0], 
             scale: [1, 1 + springVolume.get() * 0.5, 1], 
           }}
-          transition={{
-            repeat: Infinity,
-            duration: p.duration,
-            delay: p.delay,
-            ease: "easeInOut"
-          }}
+          transition={{ repeat: Infinity, duration: p.duration, delay: p.delay, ease: "easeInOut" }}
         />
       ))}
 
+      {/* 정령 이미지 */}
       <motion.div
         className="relative z-10 w-[280px] h-[380px] md:w-[400px] md:h-[550px] rounded-[40px] overflow-hidden pointer-events-none"
         style={{ scale: useSpring(useMotionValue(1), { stiffness: 100 }) }}
@@ -202,16 +233,29 @@ export default function BambooForest() {
           style={{ backdropFilter: blurValue, opacity: opacityValue }}
         />
         <Image 
-          src="/images/spirit_final.png" 
-          alt="Bamboo Spirit" 
-          fill
-          className="object-cover"
-          priority
+          src="/images/spirit_final.png" alt="Bamboo Spirit" fill className="object-cover" priority 
           sizes="(max-width: 768px) 100vw, 50vw"
         />
         <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-white/5 to-white/10 mix-blend-overlay" />
       </motion.div>
 
+      {/* [Step 2] 정령의 편지 메시지 오버레이 */}
+      <AnimatePresence>
+        {callStatus === 'idle' && spiritMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="absolute z-40 top-1/4 px-8 text-center pointer-events-none"
+          >
+            <p className="text-white/80 font-light text-lg leading-relaxed tracking-wide italic drop-shadow-lg">
+              "{spiritMessage}"
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* UI 컨트롤 */}
       <div className="absolute bottom-20 z-50 flex flex-col items-center gap-8 w-full pointer-events-none">
         <AnimatePresence mode="wait">
           {callStatus === 'idle' ? (
@@ -255,10 +299,7 @@ export default function BambooForest() {
                   {getStatusText()}
                 </motion.span>
                 <div className="flex gap-1 items-center h-1 w-24 bg-white/5 rounded-full overflow-hidden">
-                  <motion.div 
-                    className="h-full bg-green-400/40"
-                    style={{ width: barWidth }}
-                  />
+                  <motion.div className="h-full bg-green-400/40" style={{ width: barWidth }} />
                 </div>
               </div>
             </motion.div>
