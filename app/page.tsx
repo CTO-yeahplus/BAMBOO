@@ -3,51 +3,41 @@
 import { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence, useSpring, useMotionValue, PanInfo, useTransform } from 'framer-motion';
-import { Book, X, Star, Share2, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Trees, CloudRain, Flame, Waves, Lock } from 'lucide-react';import { useBambooEngine } from './hooks/useBambooEngine';
-import { useRipple } from './hooks/useRipple'; // [New] Ripple Hook
-import { Particle, Memory, SoundTheme } from './types'; // SoundTheme 추가 필요
+import { Book, X, Star, Share2, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Trees, CloudRain, Flame, Waves, Lock, Sun, Settings2, Volume2, Mic } from 'lucide-react';
+import { useBambooEngine } from './hooks/useBambooEngine';
+import { useRipple } from './hooks/useRipple';
+import { Particle, Memory } from './types';
 import { getMoonPhase, getMoonIconPath } from './utils/moonPhase';
 
-// ... (상수 및 SVG 컴포넌트들 유지) ...
 const WHISPERS = ["오늘 하루는 어땠어?", "누구에게도 말 못 할 고민이 있니?", "그냥 빗소리만 듣고 싶다면, 그래도 돼.", "무거운 짐은 잠시 여기에 내려놓아.", "바람이 네 이야기를 기다리고 있어.", "괜찮아, 아무 말 안 해도 돼.", "어제보다 오늘 마음은 좀 어때?"];
 const SOUL_LEVELS: { [key: number]: { name: string, color: string } } = { 1: { name: "Mist", color: "rgba(255, 255, 255, 0.4)" }, 2: { name: "Dew", color: "rgba(0, 255, 255, 0.6)" }, 3: { name: "Bloom", color: "rgba(200, 100, 255, 0.6)" }, 4: { name: "Aurora", color: "rgba(255, 215, 0, 0.7)" }, };
-// [New] Ambient Sounds Definition
+
+// [Fix] Sound Mapping - level을 1로 풀어둠 (모두 해금)
+// type 값은 audioRefs의 key와 일치해야 함: 'clear', 'rain', 'ember', 'snow'
 const AMBIENT_SOUNDS: { id: string, name: string, icon: any, level: number, type: 'clear' | 'rain' | 'ember' | 'snow' }[] = [
-  { id: 'forest', name: 'Deep Forest', icon: Trees, level: 1, type: 'clear' },
-  { id: 'rain', name: 'Rainy Window', icon: CloudRain, level: 2, type: 'rain' },
-  { id: 'fire', name: 'Crackling Fire', icon: Flame, level: 3, type: 'ember' },
-  { id: 'ocean', name: 'Windy Peaks', icon: Waves, level: 1, type: 'snow' },
+    { id: 'forest', name: 'Deep Forest', icon: Trees, level: 1, type: 'clear' },
+    { id: 'rain', name: 'Rainy Window', icon: CloudRain, level: 1, type: 'rain' },
+    { id: 'fire', name: 'Crackling Fire', icon: Flame, level: 1, type: 'ember' },
+    { id: 'ocean', name: 'Windy Peaks', icon: Waves, level: 1, type: 'snow' },
 ];
+
 const Hydrangea = ({ className }: { className?: string }) => ( <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.5"><path d="M12 22c4.97 0 9-4.03 9-9s-4.03-9-9-9-9 4.03-9 9 4.03 9 9 9z" className="text-blue-400/30 fill-blue-500/20" style={{ filter: 'blur(4px)' }} /><circle cx="12" cy="12" r="2" className="fill-blue-200" /><circle cx="8" cy="12" r="2" className="fill-purple-200" /><circle cx="16" cy="12" r="2" className="fill-indigo-200" /><circle cx="12" cy="8" r="2" className="fill-blue-200" /><circle cx="12" cy="16" r="2" className="fill-purple-200" /></svg>);
 const SpiderLily = ({ className }: { className?: string }) => ( <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1"><path d="M12 22c4.97 0 9-4.03 9-9s-4.03-9-9-9-9 4.03-9 9 4.03 9 9 9z" className="text-red-500/30 fill-red-600/20" style={{ filter: 'blur(4px)' }} /><path d="M12 12L12 4M12 12L18 6M12 12L20 12M12 12L18 18M12 12L12 20M12 12L6 18M12 12L4 12M12 12L6 6" stroke="currentColor" className="text-red-400" /><circle cx="12" cy="12" r="1.5" className="fill-red-200" /></svg>);
 const Moonflower = ({ className }: { className?: string }) => ( <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.5"><path d="M12 22c4.97 0 9-4.03 9-9s-4.03-9-9-9-9 4.03-9 9 4.03 9 9 9z" className="text-white/30 fill-white/10" style={{ filter: 'blur(5px)' }} /><path d="M12 6L13.5 10.5L18 12L13.5 13.5L12 18L10.5 13.5L6 12L10.5 10.5L12 6Z" className="fill-yellow-100 text-yellow-100" /></svg>);
 const MemoryFlower = ({ emotion, isSelected }: { emotion?: string; isSelected: boolean }) => { const glowClass = isSelected ? "drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]" : "drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]"; switch (emotion) { case 'sadness': return <Hydrangea className={`w-8 h-8 ${glowClass} transition-all duration-500`} />; case 'anger': return <SpiderLily className={`w-8 h-8 ${glowClass} transition-all duration-500`} />; default: return <Moonflower className={`w-8 h-8 ${glowClass} transition-all duration-500`} />; }};
 
-// Constellation Component
 const ConstellationLayer = ({ memories }: { memories: Memory[] }) => {
   const sortedMemories = useMemo(() => {
     return [...memories].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   }, [memories]);
-
   if (sortedMemories.length < 2) return null;
-
   return (
     <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
       {sortedMemories.map((memory, index) => {
         if (index === 0) return null;
         const prev = sortedMemories[index - 1];
         return (
-          <motion.line
-            key={`line-${memory.id}`}
-            x1={`${prev.x}%`} y1={`${prev.y}%`}
-            x2={`${memory.x}%`} y2={`${memory.y}%`}
-            stroke="rgba(255, 255, 255, 0.15)"
-            strokeWidth="1"
-            strokeDasharray="4 4"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ pathLength: 1, opacity: 1 }}
-            transition={{ duration: 1.5, delay: index * 0.2, ease: "easeInOut" }}
-          />
+          <motion.line key={`line-${memory.id}`} x1={`${prev.x}%`} y1={`${prev.y}%`} x2={`${memory.x}%`} y2={`${memory.y}%`} stroke="rgba(255, 255, 255, 0.15)" strokeWidth="1" strokeDasharray="4 4" initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: 1.5, delay: index * 0.2, ease: "easeInOut" }} />
         );
       })}
     </svg>
@@ -64,16 +54,16 @@ export default function BambooForest() {
     soulLevel, resonance,
     hasCollectedDew, collectDew, dailyQuote,
     isBreathing, toggleBreathing,
-    playPaperRustle, playMagicDust,
-    triggerLight, selectedAmbience, changeAmbience
+    playPaperRustle, playMagicDust, triggerLight,
+    selectedAmbience, changeAmbience,
+    isDaytime, bgVolume, setBgVolume, voiceVolume, setVoiceVolume
   } = useBambooEngine();
 
-  // [New] Use Ripple Hook
   const { ripples, addRipple } = useRipple();
-
   const [showJournal, setShowJournal] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [whisperIndex, setWhisperIndex] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
 
   const moonPhase = useMemo(() => getMoonPhase(new Date()), []);
   const moonPath = getMoonIconPath(moonPhase);
@@ -99,14 +89,11 @@ export default function BambooForest() {
 
   const handleToggleJournal = () => { playPaperRustle(); triggerLight(); setShowJournal(!showJournal); };
   const handleSelectFlower = (m: Memory) => { playMagicDust(); triggerLight(); setSelectedMemory(m); };
-
-  // [New] Global Click Handler for Ripple
-  const handleGlobalClick = (e: React.PointerEvent) => {
-    addRipple(e);
-  };
+  const handleGlobalClick = (e: React.PointerEvent) => { addRipple(e); };
 
   return (
     <main className="relative flex flex-col items-center justify-center w-full h-screen overflow-hidden bg-black touch-none" onMouseMove={handleMouseMove} onPointerDown={handleGlobalClick}>
+      {/* Audio Sources: ref 키와 src 파일이 올바르게 매핑되었는지 확인 */}
       <audio ref={(el) => { audioRefs.current.clear = el; }} src="/sounds/forest_ambience.mp3" loop />
       <audio ref={(el) => { audioRefs.current.rain = el; }} src="/sounds/rain.mp3" loop />
       <audio ref={(el) => { audioRefs.current.snow = el; }} src="/sounds/wind.mp3" loop />
@@ -114,12 +101,18 @@ export default function BambooForest() {
       
       <motion.div className="absolute inset-0 w-full h-full" animate={{ filter: hasStarted ? 'blur(0px)' : 'blur(20px)', opacity: hasStarted ? 1 : 0 }} transition={{ duration: 2 }}>
         
-        {/* Background & Layers */}
+        {/* Background Layer */}
         <motion.div className="absolute inset-[-5%] w-[110%] h-[110%]" style={{ x: bgX, y: bgY }}>
            <motion.div className={`absolute inset-0 bg-gradient-to-b ${backgroundGradient.join(' ')}`} animate={{ opacity: callStatus === 'idle' && !showJournal ? 0.7 : showJournal ? 0.2 : 1 }} transition={{ duration: 2.5 }} />
         </motion.div>
+
+        {/* Celestial Body Layer */}
         <motion.div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none z-0 mix-blend-screen" style={{ x: moonX, y: moonY }}>
-            <div className="relative w-32 h-32 opacity-80"><svg viewBox="0 0 24 24" className="w-full h-full text-yellow-100 blur-[0.5px] drop-shadow-[0_0_15px_rgba(255,255,200,0.5)]"><path d={moonPath} fill="currentColor" /></svg><div className="absolute inset-0 bg-yellow-100/20 blur-[50px] rounded-full" /></div>
+            {isDaytime ? (
+                <div className="relative w-32 h-32 opacity-90"><svg viewBox="0 0 24 24" className="w-full h-full text-orange-100 blur-[1px] drop-shadow-[0_0_30px_rgba(255,200,100,0.8)]"><circle cx="12" cy="12" r="8" fill="currentColor" /></svg><div className="absolute inset-0 bg-orange-200/30 blur-[60px] rounded-full" /></div>
+            ) : (
+                <div className="relative w-32 h-32 opacity-80"><svg viewBox="0 0 24 24" className="w-full h-full text-yellow-100 blur-[0.5px] drop-shadow-[0_0_15px_rgba(255,255,200,0.5)]"><path d={moonPath} fill="currentColor" /></svg><div className="absolute inset-0 bg-yellow-100/20 blur-[50px] rounded-full" /></div>
+            )}
         </motion.div>
         
         {/* Ripples */}
@@ -134,7 +127,7 @@ export default function BambooForest() {
           )}
         </AnimatePresence>
 
-        {/* Morning Dew & Daily Quote */}
+        {/* Morning Dew */}
         <AnimatePresence>
           {!hasCollectedDew && callStatus === 'idle' && !showJournal && !isBreathing && (
             <motion.button initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 2, filter: "blur(10px)" }} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={collectDew} className="absolute top-8 right-8 z-50 group cursor-pointer flex flex-col items-center gap-2">
@@ -156,7 +149,7 @@ export default function BambooForest() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm">
               <ConstellationLayer memories={memories} />
               {memories.map((memory, index) => (
-                <motion.button key={memory.id} className="absolute flex items-center justify-center group" style={{ top: `${memory.y}%`, left: `${memory.x}%` }} initial={{ scale: 0, opacity: 0, rotate: -45 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} transition={{ delay: index * 0.1, type: "spring", stiffness: 200, damping: 15 }} onClick={() => handleSelectFlower(memory)}>
+                <motion.button key={memory.id} className="absolute flex items-center justify-center group -translate-x-1/2 -translate-y-1/2" style={{ top: `${memory.y}%`, left: `${memory.x}%` }} initial={{ scale: 0, opacity: 0, rotate: -45 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} transition={{ delay: index * 0.1, type: "spring", stiffness: 200, damping: 15 }} onClick={() => handleSelectFlower(memory)}>
                   <div className="relative hover:scale-125 transition-transform duration-300"><MemoryFlower emotion={memory.emotion} isSelected={selectedMemory?.id === memory.id} /><div className={`absolute inset-0 blur-md opacity-40 animate-pulse ${memory.emotion === 'anger' ? 'bg-red-500' : memory.emotion === 'sadness' ? 'bg-blue-500' : 'bg-yellow-200'}`} /></div>
                 </motion.button>
               ))}
@@ -210,44 +203,35 @@ export default function BambooForest() {
           )}
         </AnimatePresence>
 
-        {/* --- [New] Ambient Sanctuary UI (Bottom Bar) --- */}
-        <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-4 z-50 pointer-events-none">
-            {/* Soul Level Indicator (Left) */}
+        {/* Settings Overlay (Volume) */}
+        <AnimatePresence>
+            {showSettings && (
+                <motion.div initial={{ opacity: 0, y: 20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.9 }} className="absolute bottom-24 right-8 z-50 w-64 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 shadow-2xl origin-bottom-right">
+                    <div className="flex justify-between items-center mb-6"><span className="text-white/60 text-xs font-mono tracking-widest uppercase">Harmony</span><button onClick={() => setShowSettings(false)} className="text-white/40 hover:text-white"><X size={14}/></button></div>
+                    <div className="mb-6 space-y-3"><div className="flex justify-between text-white/80"><Volume2 size={14} /><span className="text-[10px] font-mono">{Math.round(bgVolume * 100)}%</span></div><input type="range" min="0" max="1" step="0.01" value={bgVolume} onChange={(e) => setBgVolume(parseFloat(e.target.value))} className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full" /></div>
+                    <div className="space-y-3"><div className="flex justify-between text-white/80"><Mic size={14} /><span className="text-[10px] font-mono">{Math.round(voiceVolume * 100)}%</span></div><input type="range" min="0" max="1" step="0.01" value={voiceVolume} onChange={(e) => setVoiceVolume(parseFloat(e.target.value))} className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full" /></div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+
+        {/* --- [Updated] UI Separation --- */}
+        
+        {/* 1. Ambient Bar (Bottom Footer) */}
+        <div className="absolute bottom-10 left-0 right-0 flex justify-center items-center gap-4 z-50 pointer-events-none">
             <div className="absolute left-8 flex flex-col gap-1 items-start">
                 <div className="flex items-center gap-2 text-white/40 text-xs font-mono tracking-widest uppercase"><Sparkles size={12} /><span>Phase {soulLevel}: {SOUL_LEVELS[soulLevel].name}</span></div>
                 <div className="w-24 h-0.5 bg-white/10 rounded-full overflow-hidden"><motion.div className="h-full bg-white/40" initial={{ width: 0 }} animate={{ width: `${getProgress()}%` }} transition={{ duration: 1 }} /></div>
             </div>
-
-            {/* Ambient Player (Center) */}
             {callStatus === 'idle' && !showJournal && !isBreathing && (
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }} 
-                    animate={{ opacity: 1, y: 0 }} 
-                    className="pointer-events-auto flex items-center gap-2 px-2 py-2 bg-black/30 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl"
-                >
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="pointer-events-auto flex items-center gap-2 px-2 py-2 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl">
                     {AMBIENT_SOUNDS.map((sound) => {
                         const isLocked = soulLevel < sound.level;
-                        const isSelected = (selectedAmbience || 'clear') === sound.type; // 기본값 clear
+                        const isSelected = (selectedAmbience || 'clear') === sound.type;
                         const Icon = sound.icon;
-
                         return (
-                            <button
-                                key={sound.id}
-                                onClick={() => !isLocked && changeAmbience(sound.type)}
-                                disabled={isLocked}
-                                className={`relative p-3 rounded-full transition-all duration-300 group ${isSelected ? 'bg-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'text-white/40 hover:bg-white/10 hover:text-white/80'}`}
-                            >
-                                {isLocked ? (
-                                    <Lock size={16} className="opacity-50" />
-                                ) : (
-                                    <Icon size={18} strokeWidth={isSelected ? 2 : 1.5} />
-                                )}
-                                {/* Tooltip */}
-                                {!isLocked && (
-                                    <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[9px] text-white/80 bg-black/60 backdrop-blur-md px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                                        {sound.name}
-                                    </span>
-                                )}
+                            <button key={sound.id} onClick={() => !isLocked && changeAmbience(sound.type)} disabled={isLocked} className={`relative p-3 rounded-full transition-all duration-300 group ${isSelected ? 'bg-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'text-white/40 hover:bg-white/10 hover:text-white/80'}`}>
+                                {isLocked ? (<Lock size={16} className="opacity-50" />) : (<Icon size={18} strokeWidth={isSelected ? 2 : 1.5} />)}
+                                {!isLocked && (<span className="absolute -top-10 left-1/2 -translate-x-1/2 text-[9px] text-white/80 bg-black/60 backdrop-blur-md px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">{sound.name}</span>)}
                             </button>
                         );
                     })}
@@ -255,32 +239,18 @@ export default function BambooForest() {
             )}
         </div>
 
-        {/* Top Left Buttons */}
-        <div className="absolute top-8 left-8 z-50 flex flex-col gap-4">
-          {callStatus === 'idle' && (
-            <motion.button onClick={handleToggleJournal} className="p-3 bg-white/10 rounded-full backdrop-blur-md border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-              {showJournal ? <X size={20} /> : <Book size={20} />}
-            </motion.button>
-          )}
-          {callStatus === 'idle' && !showJournal && (
-             <motion.button onClick={toggleBreathing} className={`p-3 rounded-full backdrop-blur-md border transition-all duration-500 ${isBreathing ? 'bg-blue-500/20 border-blue-400/50 text-blue-200' : 'bg-white/10 border-white/10 text-white/70 hover:bg-white/20 hover:text-white'}`} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                {isBreathing ? <X size={20} /> : <Wind size={20} />}
-             </motion.button>
-          )}
-        </div>
-
-        {/* Center Controls (Call Button) */}
-        <div className="absolute bottom-20 z-50 w-full flex flex-col items-center gap-8 pointer-events-none">
+        {/* 2. Main Call Controls (Raised Position) */}
+        <div className="absolute top-[65%] left-0 right-0 z-40 w-full flex flex-col items-center gap-8 pointer-events-none">
           <AnimatePresence mode="wait">
             {callStatus === 'idle' && !showJournal && !spiritMessage && !isBreathing && (
-              <motion.div key={WHISPERS[whisperIndex]} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 1.5, ease: "easeInOut" }} className="absolute -top-20 text-white/60 text-sm font-light italic tracking-wider drop-shadow-md text-center px-4 w-full">
+              <motion.div key={WHISPERS[whisperIndex]} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 1.5, ease: "easeInOut" }} className="absolute -top-16 text-white/60 text-sm font-light italic tracking-wider drop-shadow-md text-center px-4 w-full">
                 {WHISPERS[whisperIndex]}
               </motion.div>
             )}
           </AnimatePresence>
           <AnimatePresence mode="wait">
             {callStatus === 'idle' && !showJournal && !isBreathing ? (
-              <motion.button key="start-btn" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.1 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }} onClick={toggleCall} className="pointer-events-auto px-10 py-5 text-sm font-medium text-white bg-white/5 border border-white/10 rounded-full backdrop-blur-2xl shadow-2xl hover:bg-white/10 transition-all tracking-widest cursor-pointer">
+              <motion.button key="start-btn" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.1 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }} onClick={toggleCall} className="pointer-events-auto px-12 py-6 text-sm font-medium text-white bg-white/10 border border-white/20 rounded-full backdrop-blur-xl shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-white/20 transition-all tracking-widest cursor-pointer">
                 숲으로 입장하기
               </motion.button>
             ) : callStatus !== 'idle' ? (
@@ -297,15 +267,37 @@ export default function BambooForest() {
             ) : null}
           </AnimatePresence>
         </div>
+
+        {/* Top Left Buttons */}
+        <div className="absolute top-8 left-8 z-50 flex flex-col gap-4">
+          {callStatus === 'idle' && (
+            <motion.button onClick={handleToggleJournal} className="p-3 bg-white/10 rounded-full backdrop-blur-md border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+              {showJournal ? <X size={20} /> : <Book size={20} />}
+            </motion.button>
+          )}
+          {callStatus === 'idle' && !showJournal && (
+             <motion.button onClick={toggleBreathing} className={`p-3 rounded-full backdrop-blur-md border transition-all duration-500 ${isBreathing ? 'bg-blue-500/20 border-blue-400/50 text-blue-200' : 'bg-white/10 border-white/10 text-white/70 hover:bg-white/20 hover:text-white'}`} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                {isBreathing ? <X size={20} /> : <Wind size={20} />}
+             </motion.button>
+          )}
+        </div>
+
+        {/* Bottom Right Settings Button */}
+        {callStatus === 'idle' && !showJournal && !isBreathing && (
+            <div className="absolute bottom-8 right-8 z-50">
+                <motion.button onClick={() => { triggerLight(); setShowSettings(!showSettings); }} className={`p-3 rounded-full backdrop-blur-md border transition-all ${showSettings ? 'bg-white/20 border-white/20 text-white' : 'bg-black/20 border-white/10 text-white/60 hover:bg-white/10 hover:text-white'}`} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                    <Settings2 size={20} />
+                </motion.button>
+            </div>
+        )}
+
       </motion.div>
 
-      {/* Cinematic Texture */}
+      {/* Cinematic Texture & Intro */}
       <div className="absolute inset-0 pointer-events-none z-[60]">
         <div className="absolute inset-0 opacity-[0.07] mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.6)_100%)]" />
       </div>
-
-      {/* Intro Layer */}
       <AnimatePresence>
         {!hasStarted && isMounted && (
           <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 2, ease: "easeInOut" } }} className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black cursor-pointer" onClick={startExperience}>

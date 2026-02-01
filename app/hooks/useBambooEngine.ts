@@ -8,7 +8,7 @@ import html2canvas from 'html2canvas';
 import { createClient } from '@supabase/supabase-js';
 import { WeatherType, CallStatus, TIME_THEMES, EMOTION_COLORS, Memory } from '../types';
 import { useSoundEngine } from './useSoundEngine'; 
-import { useHaptic } from './useHaptic'; // [New] Haptic 추가
+import { useHaptic } from './useHaptic';
 
 const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || '';
 const ASSISTANT_ID = process.env.NEXT_PUBLIC_ASSISTANT_ID || '';
@@ -37,22 +37,25 @@ export function useBambooEngine() {
   const [capturingId, setCapturingId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
+  const [isDaytime, setIsDaytime] = useState(false);
 
-  // Gamification & Dew
+  // Volume States
+  const [bgVolume, setBgVolume] = useState(0.5);
+  const [voiceVolume, setVoiceVolume] = useState(1.0);
+
+  // Gamification
   const [resonance, setResonance] = useState(0); 
   const [soulLevel, setSoulLevel] = useState(1);
   const [hasCollectedDew, setHasCollectedDew] = useState(true);
   const [dailyQuote, setDailyQuote] = useState<string | null>(null);
 
-  // Breathing Mode
+  // Breathing & Ambience
   const [isBreathing, setIsBreathing] = useState(false);
-
-  // [New] 사용자가 선택한 앰비언스 (null이면 자동 날씨 모드)
   const [selectedAmbience, setSelectedAmbience] = useState<WeatherType | null>(null);
 
   // Engines
   const { initAudio, playWaterDrop, playWindChime, playPaperRustle, playMagicDust } = useSoundEngine();
-  const { triggerLight, triggerMedium, triggerBreathing } = useHaptic(); // [New] Haptic Engine
+  const { triggerLight, triggerMedium, triggerBreathing } = useHaptic();
 
   // --- Animation Values ---
   const volumeMotion = useMotionValue(0);
@@ -73,20 +76,100 @@ export function useBambooEngine() {
 
   const motionValues = { blurValue, opacityValue, barWidth, springVolume, mouseX, mouseY };
   const vapiRef = useRef<any>(null);
+  // 오디오 요소 참조
   const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({ clear: null, rain: null, snow: null, ember: null });
+  // 페이드 인/아웃 인터벌 관리용 참조 (메모리 누수 방지)
+  const fadeIntervals = useRef<{ [key in WeatherType]: NodeJS.Timeout | null }>({ clear: null, rain: null, snow: null, ember: null });
 
-  // --- Helpers ---
+  // --- Helpers: Audio Fader ---
+  const fadeToVolume = (type: WeatherType, targetVol: number, duration: number = 1000) => {
+    const audio = audioRefs.current[type];
+    if (!audio) return;
+
+    // 기존 인터벌 정지
+    if (fadeIntervals.current[type]) {
+      clearInterval(fadeIntervals.current[type]!);
+    }
+
+    const stepTime = 50; // 50ms마다 업데이트
+    const steps = duration / stepTime;
+    const volDiff = targetVol - audio.volume;
+    const stepVol = volDiff / steps;
+
+    // 타겟이 0보다 크면 재생 시작
+    if (targetVol > 0 && audio.paused) {
+        audio.play().catch(e => console.error("Audio play failed:", e));
+    }
+
+    fadeIntervals.current[type] = setInterval(() => {
+        let newVol = audio.volume + stepVol;
+        
+        // 범위 제한 및 종료 조건
+        if ((stepVol > 0 && newVol >= targetVol) || (stepVol < 0 && newVol <= targetVol)) {
+            audio.volume = targetVol;
+            clearInterval(fadeIntervals.current[type]!);
+            if (targetVol === 0) audio.pause(); // 볼륨 0이면 정지
+        } else {
+            // 안전하게 범위 내에서 설정
+            newVol = Math.max(0, Math.min(1, newVol));
+            audio.volume = newVol;
+        }
+    }, stepTime);
+  };
+
   const checkTimeOfDay = useCallback(() => {
     const hour = new Date().getHours();
     let theme = TIME_THEMES.night;
-    if (hour >= 5 && hour < 7) theme = TIME_THEMES.dawn;
-    else if (hour >= 7 && hour < 17) theme = TIME_THEMES.day;
-    else if (hour >= 17 && hour < 20) theme = TIME_THEMES.sunset;
+    
+    if (hour >= 6 && hour < 18) {
+        setIsDaytime(true);
+        if (hour < 7) theme = TIME_THEMES.dawn;      
+        else if (hour >= 17) theme = TIME_THEMES.sunset; 
+        else theme = TIME_THEMES.day;                
+    } else {
+        setIsDaytime(false);
+        if (hour >= 18 && hour < 20) theme = TIME_THEMES.sunset; 
+        else theme = TIME_THEMES.night;
+    }
+
     setBackgroundGradient(theme);
-    // 자동 날씨 변경은 사용자가 선택한 앰비언스가 없을 때만
     if (!selectedAmbience) setWeather('clear');
-    setShowEasterEgg(hour === 3);
-  }, []);
+    setShowEasterEgg(hour === 3); 
+  }, [selectedAmbience]);
+
+  // --- Main Audio Logic (Fixed) ---
+  useEffect(() => {
+    if (!isMounted || !hasStarted) return;
+    
+    // 타겟 사운드 결정
+    const targetKey = selectedAmbience || weather;
+
+    Object.keys(audioRefs.current).forEach((key) => {
+      const type = key as WeatherType;
+      
+      if (type === targetKey) {
+        // 선택된 오디오: 현재 bgVolume으로 페이드 인 (또는 볼륨 유지)
+        // 이미 재생 중이고 볼륨이 비슷하면 건너뜀 (불필요한 인터벌 방지)
+        const audio = audioRefs.current[type];
+        if (audio && (audio.paused || Math.abs(audio.volume - bgVolume) > 0.01)) {
+             fadeToVolume(type, bgVolume, 1000); // 1초 동안 페이드
+        }
+      } else {
+        // 선택되지 않은 오디오: 0으로 페이드 아웃 후 정지
+        const audio = audioRefs.current[type];
+        if (audio && !audio.paused && audio.volume > 0) {
+            fadeToVolume(type, 0, 1000);
+        }
+      }
+    });
+  }, [weather, selectedAmbience, callStatus, isMounted, hasStarted, bgVolume]);
+
+  const changeAmbience = (type: WeatherType) => {
+    if (selectedAmbience === type) return;
+    triggerLight();
+    setSelectedAmbience(type);
+    setWeather(type);
+  };
 
   const fetchMemories = useCallback(async (uid: string) => {
     if (!uid) return;
@@ -121,27 +204,13 @@ export function useBambooEngine() {
 
   const startExperience = () => {
     setHasStarted(true);
-    triggerLight(); // [Haptic] 입장 진동
-    initAudio(); // 데스크탑 오디오 엔진 강제 기동
+    triggerLight();
+    initAudio(); 
     playMagicDust();
-    const currentAudioKey = selectedAmbience || 'clear'; 
-    const currentAudio = audioRefs.current[currentAudioKey];
-    if (currentAudio) {
-        currentAudio.volume = 0; // 볼륨 0에서 시작
-        
-        // Promise로 재생 시도 (데스크탑 대응)
-        const playPromise = currentAudio.play();
-        
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            // 재생 성공 시 페이드 인
-            currentAudio.animate([{ volume: 0 }, { volume: 0.05 }], { duration: 3000, fill: 'forwards' });
-          }).catch(error => {
-            console.error("Desktop Audio Autoplay prevented:", error);
-            // 실패 시 (드문 경우) 다시 한 번 시도하거나 사용자에게 알림
-          });
-        }
-      }
+    
+    // 시작 시 강제 재생 (bgVolume 적용)
+    const currentAudioKey = selectedAmbience || 'clear';
+    fadeToVolume(currentAudioKey, bgVolume, 2000); // 2초 동안 천천히 시작
   };
 
   const shareMemory = useCallback(async (memory: Memory) => {
@@ -184,7 +253,6 @@ export function useBambooEngine() {
         localStorage.setItem('spirit_resonance', next.toString());
         return next;
     });
-
     const randomQuote = DAILY_QUOTES[Math.floor(Math.random() * DAILY_QUOTES.length)];
     setDailyQuote(randomQuote);
     const today = new Date().toDateString();
@@ -193,22 +261,11 @@ export function useBambooEngine() {
     setTimeout(() => setDailyQuote(null), 5000);
   }, [playWaterDrop, triggerMedium]);
 
-  // [New] Ambience Change Handler
-  const changeAmbience = (type: WeatherType) => {
-    if (selectedAmbience === type) return; // 이미 선택됨
-    triggerLight();
-    setSelectedAmbience(type);
-    setWeather(type); // 시각적 효과도 같이 변경
-  };
-
-  // [New] Breathing Haptic Loop
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isBreathing) {
-      triggerBreathing(); // 시작 시 한번
-      interval = setInterval(() => {
-        triggerBreathing();
-      }, 9500); // 호흡 주기(약 19초)의 절반(들이마실때, 내뱉을때) 즈음에 맞춰 진동
+      triggerBreathing(); 
+      interval = setInterval(() => { triggerBreathing(); }, 9500); 
     }
     return () => clearInterval(interval);
   }, [isBreathing, triggerBreathing]);
@@ -242,26 +299,6 @@ export function useBambooEngine() {
     else setSoulLevel(4);
   }, [resonance]);
 
-  // [Update] Audio Logic: Override with selectedAmbience
-  useEffect(() => {
-    if (!isMounted || !hasStarted || callStatus === 'idle') return;
-    
-    // 타겟 사운드 결정: 수동 선택이 있으면 그것, 없으면 자동 날씨
-    const targetSound = selectedAmbience || weather;
-
-    Object.entries(audioRefs.current).forEach(([key, audio]) => {
-      if (!audio) return;
-      if (key === targetSound) {
-        audio.play().catch(() => {});
-        audio.animate([{ volume: audio.volume }, { volume: 0.05 }], { duration: 2000, fill: 'forwards' });
-      } else if (!audio.paused) {
-        audio.animate([{ volume: audio.volume }, { volume: 0 }], { duration: 2000, fill: 'forwards' }).onfinish = () => {
-          audio.pause(); audio.currentTime = 0;
-        };
-      }
-    });
-  }, [weather, selectedAmbience, callStatus, isMounted, hasStarted]);
-
   useEffect(() => {
     setIsMounted(true);
     checkTimeOfDay();
@@ -276,30 +313,20 @@ export function useBambooEngine() {
     const vapi = new Vapi(VAPI_PUBLIC_KEY);
     vapiRef.current = vapi;
 
-    vapi.on('call-start', () => { 
-        triggerMedium(); // [Haptic] 통화 시작
-        setCallStatus('active'); 
-        setSpiritMessage(null); 
-        setIsBreathing(false); 
-    });
-
+    vapi.on('call-start', () => { triggerMedium(); setCallStatus('active'); setSpiritMessage(null); setIsBreathing(false); });
     vapi.on('call-end', () => {
-      triggerLight(); // [Haptic] 통화 종료
-      setCallStatus('idle'); volumeMotion.set(0);
+      triggerLight(); setCallStatus('idle'); volumeMotion.set(0);
       const messages = [ "비가 그치면 땅이 더 단단해질 거야.", "언제든 여기서 기다릴게.", "오늘 밤은 푹 잘 수 있을 거야.", "바람이 네 걱정을 가져갔어." ];
       setSpiritMessage(messages[Math.floor(Math.random() * messages.length)]);
       checkTimeOfDay(); 
       if (userId) saveFallbackMemory(userId); 
     });
-
     vapi.on('error', (e: any) => {
         console.log("Vapi Connection Closed (Silence/Error):", e);
-        setCallStatus('idle'); 
-        volumeMotion.set(0);
+        setCallStatus('idle'); volumeMotion.set(0);
         setSpiritMessage("바람이 잠시 멈추었어. 다시 말을 걸어줄래?");
         checkTimeOfDay();
     });
-
     vapi.on('volume-level', (volume: number) => volumeMotion.set(Math.min(volume * 2.5, 1)));
     vapi.on('speech-start', () => setCallStatus('listening'));
     vapi.on('speech-end', () => setCallStatus('processing'));
@@ -307,7 +334,6 @@ export function useBambooEngine() {
     vapi.on('assistant-speech-end', () => setCallStatus('active'));
     vapi.on('structured-output', (output: { type: string; value: any }) => {
         if (output.type === 'primary_struggle_category') {
-          // [Update] 수동 모드가 아닐 때만 감정에 따라 날씨 변경
           if (!selectedAmbience) {
               const category = (output.value as string).toLowerCase();
               if (Object.keys(EMOTION_COLORS).includes(category)) setBackgroundGradient(EMOTION_COLORS[category as keyof typeof EMOTION_COLORS]);
@@ -319,18 +345,14 @@ export function useBambooEngine() {
         }
       });
 
-      return () => { clearInterval(interval); try { vapi.stop(); vapi.removeAllListeners(); } catch (e) {} };
-    }, [volumeMotion, weather, userId, fetchMemories, checkTimeOfDay, triggerLight, triggerMedium, selectedAmbience]);
+    return () => { clearInterval(interval); try { vapi.stop(); vapi.removeAllListeners(); } catch (e) {} };
+  }, [volumeMotion, weather, userId, fetchMemories, checkTimeOfDay, triggerLight, triggerMedium, selectedAmbience]);
 
   const toggleCall = () => {
     if (callStatus === 'idle') {
-      triggerMedium(); // [Haptic] 시작 버튼 클릭
-      setCallStatus('connecting');
-      vapiRef.current?.start(ASSISTANT_ID, { metadata: { userId: userId } });
+      triggerMedium(); setCallStatus('connecting'); vapiRef.current?.start(ASSISTANT_ID, { metadata: { userId: userId } });
     } else {
-      triggerLight(); // [Haptic] 종료 버튼 클릭
-      vapiRef.current?.stop();
-      setTimeout(() => setCallStatus('idle'), 500);
+      triggerLight(); vapiRef.current?.stop(); setTimeout(() => setCallStatus('idle'), 500);
     }
   };
 
@@ -356,6 +378,7 @@ export function useBambooEngine() {
     hasCollectedDew, collectDew, dailyQuote,
     isBreathing, toggleBreathing,
     playPaperRustle, playMagicDust,
-    triggerLight, selectedAmbience, changeAmbience, initAudio
+    triggerLight, selectedAmbience, changeAmbience, initAudio,
+    isDaytime, bgVolume, setBgVolume, voiceVolume, setVoiceVolume
   };
 }
