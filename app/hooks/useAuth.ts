@@ -41,12 +41,24 @@ export function useAuth() {
   }, []);
 
   const signInWithGoogle = async () => {
+    // [Critical Fix] 환경변수보다 현재 브라우저의 주소를 우선시합니다.
+    // 이렇게 하면 로컬에서는 localhost로, 배포환경에서는 vercel.app으로 자동 설정됩니다.
+    const redirectUrl = window.location.origin;
+    
+    console.log("Redirecting to:", redirectUrl); // 디버깅용 로그
+
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      options: { 
+        redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
     });
   };
-
+  
   // [Fix] 로그아웃 로직 강화 (에러 무시하고 강제 로그아웃)
   const signOut = async () => {
     try {
