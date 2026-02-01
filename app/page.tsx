@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence, useSpring, useMotionValue, PanInfo, useTransform } from 'framer-motion';
-import { Book, X, Star, Share2, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Trees, CloudRain, Flame, Waves, Lock, Sun, Settings2, Volume2, Mic } from 'lucide-react';
+// [Update] LogIn 아이콘 추가, Chrome 아이콘 대체용 svg 사용
+import { Book, X, Star, Share2, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Trees, CloudRain, Flame, Waves, Lock, Sun, Settings2, Volume2, Mic, LogIn, LogOut } from 'lucide-react';
 import { useBambooEngine } from './hooks/useBambooEngine';
 import { useRipple } from './hooks/useRipple';
 import { Particle, Memory } from './types';
@@ -12,8 +13,6 @@ import { getMoonPhase, getMoonIconPath } from './utils/moonPhase';
 const WHISPERS = ["오늘 하루는 어땠어?", "누구에게도 말 못 할 고민이 있니?", "그냥 빗소리만 듣고 싶다면, 그래도 돼.", "무거운 짐은 잠시 여기에 내려놓아.", "바람이 네 이야기를 기다리고 있어.", "괜찮아, 아무 말 안 해도 돼.", "어제보다 오늘 마음은 좀 어때?"];
 const SOUL_LEVELS: { [key: number]: { name: string, color: string } } = { 1: { name: "Mist", color: "rgba(255, 255, 255, 0.4)" }, 2: { name: "Dew", color: "rgba(0, 255, 255, 0.6)" }, 3: { name: "Bloom", color: "rgba(200, 100, 255, 0.6)" }, 4: { name: "Aurora", color: "rgba(255, 215, 0, 0.7)" }, };
 
-// [Fix] Sound Mapping - level을 1로 풀어둠 (모두 해금)
-// type 값은 audioRefs의 key와 일치해야 함: 'clear', 'rain', 'ember', 'snow'
 const AMBIENT_SOUNDS: { id: string, name: string, icon: any, level: number, type: 'clear' | 'rain' | 'ember' | 'snow' }[] = [
     { id: 'forest', name: 'Deep Forest', icon: Trees, level: 1, type: 'clear' },
     { id: 'rain', name: 'Rainy Window', icon: CloudRain, level: 1, type: 'rain' },
@@ -56,7 +55,8 @@ export default function BambooForest() {
     isBreathing, toggleBreathing,
     playPaperRustle, playMagicDust, triggerLight,
     selectedAmbience, changeAmbience,
-    isDaytime, bgVolume, setBgVolume, voiceVolume, setVoiceVolume
+    isDaytime, bgVolume, setBgVolume, voiceVolume, setVoiceVolume,
+    user, signInWithGoogle, signOut // [Update] Removed signInWithKakao
   } = useBambooEngine();
 
   const { ripples, addRipple } = useRipple();
@@ -68,6 +68,7 @@ export default function BambooForest() {
   const moonPhase = useMemo(() => getMoonPhase(new Date()), []);
   const moonPath = getMoonIconPath(moonPhase);
 
+  // ... (Parallax Transforms 생략 - 기존과 동일) ...
   const moonX = useTransform(motionValues.mouseX, [-1, 1], ["2%", "-2%"]); 
   const moonY = useTransform(motionValues.mouseY, [-1, 1], ["2%", "-2%"]);
   const bgX = useTransform(motionValues.mouseX, [-1, 1], ["-5%", "5%"]); 
@@ -93,7 +94,6 @@ export default function BambooForest() {
 
   return (
     <main className="relative flex flex-col items-center justify-center w-full h-screen overflow-hidden bg-black touch-none" onMouseMove={handleMouseMove} onPointerDown={handleGlobalClick}>
-      {/* Audio Sources: ref 키와 src 파일이 올바르게 매핑되었는지 확인 */}
       <audio ref={(el) => { audioRefs.current.clear = el; }} src="/sounds/forest_ambience.mp3" loop />
       <audio ref={(el) => { audioRefs.current.rain = el; }} src="/sounds/rain.mp3" loop />
       <audio ref={(el) => { audioRefs.current.snow = el; }} src="/sounds/wind.mp3" loop />
@@ -101,12 +101,10 @@ export default function BambooForest() {
       
       <motion.div className="absolute inset-0 w-full h-full" animate={{ filter: hasStarted ? 'blur(0px)' : 'blur(20px)', opacity: hasStarted ? 1 : 0 }} transition={{ duration: 2 }}>
         
-        {/* Background Layer */}
+        {/* Background & Moon Layers */}
         <motion.div className="absolute inset-[-5%] w-[110%] h-[110%]" style={{ x: bgX, y: bgY }}>
            <motion.div className={`absolute inset-0 bg-gradient-to-b ${backgroundGradient.join(' ')}`} animate={{ opacity: callStatus === 'idle' && !showJournal ? 0.7 : showJournal ? 0.2 : 1 }} transition={{ duration: 2.5 }} />
         </motion.div>
-
-        {/* Celestial Body Layer */}
         <motion.div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none z-0 mix-blend-screen" style={{ x: moonX, y: moonY }}>
             {isDaytime ? (
                 <div className="relative w-32 h-32 opacity-90"><svg viewBox="0 0 24 24" className="w-full h-full text-orange-100 blur-[1px] drop-shadow-[0_0_30px_rgba(255,200,100,0.8)]"><circle cx="12" cy="12" r="8" fill="currentColor" /></svg><div className="absolute inset-0 bg-orange-200/30 blur-[60px] rounded-full" /></div>
@@ -127,14 +125,49 @@ export default function BambooForest() {
           )}
         </AnimatePresence>
 
-        {/* Morning Dew */}
+        {/* --- [Fix] Login Button (Right Top) --- */}
+        {/* 이슬 모으기 버튼과 겹치지 않게, 이슬이 있으면 그 아래에 표시하거나 이슬이 없을 때 표시 */}
+        {/* 여기서는 이슬 버튼 바로 왼쪽에 배치하거나, 이슬이 없을 때 같은 자리에 뜨도록 조정합니다. */}
         <AnimatePresence>
-          {!hasCollectedDew && callStatus === 'idle' && !showJournal && !isBreathing && (
-            <motion.button initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 2, filter: "blur(10px)" }} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={collectDew} className="absolute top-8 right-8 z-50 group cursor-pointer flex flex-col items-center gap-2">
-              <div className="relative flex items-center justify-center w-14 h-14 bg-black/20 backdrop-blur-md rounded-full border border-white/10 shadow-lg group-hover:bg-white/10 transition-colors"><Droplets className="text-blue-200 drop-shadow-[0_0_10px_rgba(100,200,255,0.8)]" size={24} strokeWidth={1.5} /><div className="absolute inset-0 bg-blue-400 rounded-full opacity-20 animate-ping" /></div><span className="text-[10px] text-blue-100/80 tracking-widest uppercase font-medium bg-black/40 backdrop-blur-sm px-2 py-1 rounded-full border border-white/5 opacity-0 group-hover:opacity-100 transition-opacity">Collect Dew</span>
-            </motion.button>
-          )}
+            {callStatus === 'idle' && !showJournal && !isBreathing && (
+                <div className="absolute top-8 right-8 z-50 flex flex-col items-end gap-4">
+                    {/* 1. Dew Button (조건부 렌더링 유지) */}
+                    {!hasCollectedDew && (
+                        <motion.button initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0 }} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={collectDew} className="group cursor-pointer flex flex-col items-center gap-2">
+                            <div className="relative flex items-center justify-center w-12 h-12 bg-black/20 backdrop-blur-md rounded-full border border-white/10 shadow-lg group-hover:bg-white/10 transition-colors">
+                                <Droplets className="text-blue-200" size={20} />
+                                <div className="absolute inset-0 bg-blue-400 rounded-full opacity-20 animate-ping" />
+                            </div>
+                        </motion.button>
+                    )}
+
+                    {/* 2. Google Login / Logout Button (Always Visible here) */}
+                    {user ? (
+                        <motion.button 
+                            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} 
+                            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                            onClick={() => { if(confirm('로그아웃 하시겠습니까?')) signOut(); }}
+                            className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md border border-white/10 rounded-full text-white/80 hover:bg-white/20 hover:text-white transition-all shadow-lg"
+                        >
+                            <span className="text-[10px] font-medium tracking-widest uppercase truncate max-w-[100px]">{user.email?.split('@')[0]}</span>
+                            <LogOut size={14} />
+                        </motion.button>
+                    ) : (
+                        <motion.button 
+                            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} 
+                            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                            onClick={signInWithGoogle}
+                            className="flex items-center gap-2 px-4 py-2 bg-white text-black backdrop-blur-md border border-white/20 rounded-full hover:bg-gray-200 transition-all shadow-lg group"
+                        >
+                            {/* Google G Logo */}
+                            <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                            <span className="text-xs font-bold tracking-wide">Sign in</span>
+                        </motion.button>
+                    )}
+                </div>
+            )}
         </AnimatePresence>
+
         <AnimatePresence>
           {dailyQuote && (
             <motion.div initial={{ opacity: 0, y: -20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20, scale: 0.9 }} className="absolute top-28 right-8 z-50 w-[280px] md:w-[320px] pointer-events-none">
@@ -203,20 +236,19 @@ export default function BambooForest() {
           )}
         </AnimatePresence>
 
-        {/* Settings Overlay (Volume) */}
+        {/* Settings Overlay (Volume Only) */}
         <AnimatePresence>
             {showSettings && (
                 <motion.div initial={{ opacity: 0, y: 20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.9 }} className="absolute bottom-24 right-8 z-50 w-64 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 shadow-2xl origin-bottom-right">
                     <div className="flex justify-between items-center mb-6"><span className="text-white/60 text-xs font-mono tracking-widest uppercase">Harmony</span><button onClick={() => setShowSettings(false)} className="text-white/40 hover:text-white"><X size={14}/></button></div>
+                    {/* Volume Sliders */}
                     <div className="mb-6 space-y-3"><div className="flex justify-between text-white/80"><Volume2 size={14} /><span className="text-[10px] font-mono">{Math.round(bgVolume * 100)}%</span></div><input type="range" min="0" max="1" step="0.01" value={bgVolume} onChange={(e) => setBgVolume(parseFloat(e.target.value))} className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full" /></div>
                     <div className="space-y-3"><div className="flex justify-between text-white/80"><Mic size={14} /><span className="text-[10px] font-mono">{Math.round(voiceVolume * 100)}%</span></div><input type="range" min="0" max="1" step="0.01" value={voiceVolume} onChange={(e) => setVoiceVolume(parseFloat(e.target.value))} className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full" /></div>
                 </motion.div>
             )}
         </AnimatePresence>
 
-        {/* --- [Updated] UI Separation --- */}
-        
-        {/* 1. Ambient Bar (Bottom Footer) */}
+        {/* Ambient Bar (Bottom Footer) */}
         <div className="absolute bottom-10 left-0 right-0 flex justify-center items-center gap-4 z-50 pointer-events-none">
             <div className="absolute left-8 flex flex-col gap-1 items-start">
                 <div className="flex items-center gap-2 text-white/40 text-xs font-mono tracking-widest uppercase"><Sparkles size={12} /><span>Phase {soulLevel}: {SOUL_LEVELS[soulLevel].name}</span></div>
@@ -239,7 +271,7 @@ export default function BambooForest() {
             )}
         </div>
 
-        {/* 2. Main Call Controls (Raised Position) */}
+        {/* Main Call Controls (Raised Position) */}
         <div className="absolute top-[65%] left-0 right-0 z-40 w-full flex flex-col items-center gap-8 pointer-events-none">
           <AnimatePresence mode="wait">
             {callStatus === 'idle' && !showJournal && !spiritMessage && !isBreathing && (
@@ -282,7 +314,7 @@ export default function BambooForest() {
           )}
         </div>
 
-        {/* Bottom Right Settings Button */}
+        {/* Bottom Right Settings Button (Now only for Settings) */}
         {callStatus === 'idle' && !showJournal && !isBreathing && (
             <div className="absolute bottom-8 right-8 z-50">
                 <motion.button onClick={() => { triggerLight(); setShowSettings(!showSettings); }} className={`p-3 rounded-full backdrop-blur-md border transition-all ${showSettings ? 'bg-white/20 border-white/20 text-white' : 'bg-black/20 border-white/10 text-white/60 hover:bg-white/10 hover:text-white'}`} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>

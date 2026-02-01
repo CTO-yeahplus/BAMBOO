@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { WeatherType, CallStatus, TIME_THEMES, EMOTION_COLORS, Memory } from '../types';
 import { useSoundEngine } from './useSoundEngine'; 
 import { useHaptic } from './useHaptic';
+import { useAuth } from './useAuth';
 
 const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || '';
 const ASSISTANT_ID = process.env.NEXT_PUBLIC_ASSISTANT_ID || '';
@@ -30,7 +31,6 @@ export function useBambooEngine() {
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [backgroundGradient, setBackgroundGradient] = useState<string[]>(TIME_THEMES.night);
   const [weather, setWeather] = useState<WeatherType>('clear');
-  const [userId, setUserId] = useState<string>('');
   const [isMounted, setIsMounted] = useState(false);
   const [spiritMessage, setSpiritMessage] = useState<string | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
@@ -39,7 +39,11 @@ export function useBambooEngine() {
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [isDaytime, setIsDaytime] = useState(false);
 
-  // Volume States
+  // Auth & Identity
+  const { user, signInWithGoogle, signOut } = useAuth(); // signInWithKakao 제거
+  const [anonId, setAnonId] = useState<string>('');
+
+  // Volume States (기본값 설정)
   const [bgVolume, setBgVolume] = useState(0.5);
   const [voiceVolume, setVoiceVolume] = useState(1.0);
 
@@ -75,47 +79,41 @@ export function useBambooEngine() {
   }, [mouseX, mouseY]);
 
   const motionValues = { blurValue, opacityValue, barWidth, springVolume, mouseX, mouseY };
+  
   const vapiRef = useRef<any>(null);
-  // 오디오 요소 참조
   const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({ clear: null, rain: null, snow: null, ember: null });
-  // 페이드 인/아웃 인터벌 관리용 참조 (메모리 누수 방지)
   const fadeIntervals = useRef<{ [key in WeatherType]: NodeJS.Timeout | null }>({ clear: null, rain: null, snow: null, ember: null });
 
   // --- Helpers: Audio Fader ---
-  const fadeToVolume = (type: WeatherType, targetVol: number, duration: number = 1000) => {
+  const fadeToVolume = useCallback((type: WeatherType, targetVol: number, duration: number = 1000) => {
     const audio = audioRefs.current[type];
     if (!audio) return;
 
-    // 기존 인터벌 정지
     if (fadeIntervals.current[type]) {
       clearInterval(fadeIntervals.current[type]!);
     }
 
-    const stepTime = 50; // 50ms마다 업데이트
+    const stepTime = 50; 
     const steps = duration / stepTime;
     const volDiff = targetVol - audio.volume;
     const stepVol = volDiff / steps;
 
-    // 타겟이 0보다 크면 재생 시작
     if (targetVol > 0 && audio.paused) {
         audio.play().catch(e => console.error("Audio play failed:", e));
     }
 
     fadeIntervals.current[type] = setInterval(() => {
         let newVol = audio.volume + stepVol;
-        
-        // 범위 제한 및 종료 조건
         if ((stepVol > 0 && newVol >= targetVol) || (stepVol < 0 && newVol <= targetVol)) {
             audio.volume = targetVol;
             clearInterval(fadeIntervals.current[type]!);
-            if (targetVol === 0) audio.pause(); // 볼륨 0이면 정지
+            if (targetVol === 0) audio.pause();
         } else {
-            // 안전하게 범위 내에서 설정
             newVol = Math.max(0, Math.min(1, newVol));
             audio.volume = newVol;
         }
     }, stepTime);
-  };
+  }, []);
 
   const checkTimeOfDay = useCallback(() => {
     const hour = new Date().getHours();
@@ -137,38 +135,69 @@ export function useBambooEngine() {
     setShowEasterEgg(hour === 3); 
   }, [selectedAmbience]);
 
-  // --- Main Audio Logic (Fixed) ---
+  // --- Main Audio Logic ---
   useEffect(() => {
     if (!isMounted || !hasStarted) return;
     
-    // 타겟 사운드 결정
     const targetKey = selectedAmbience || weather;
 
     Object.keys(audioRefs.current).forEach((key) => {
       const type = key as WeatherType;
+      const audio = audioRefs.current[type];
       
       if (type === targetKey) {
-        // 선택된 오디오: 현재 bgVolume으로 페이드 인 (또는 볼륨 유지)
-        // 이미 재생 중이고 볼륨이 비슷하면 건너뜀 (불필요한 인터벌 방지)
-        const audio = audioRefs.current[type];
-        if (audio && (audio.paused || Math.abs(audio.volume - bgVolume) > 0.01)) {
-             fadeToVolume(type, bgVolume, 1000); // 1초 동안 페이드
+        if (audio && (audio.paused || Math.abs(audio.volume - bgVolume) > 0.05)) {
+             fadeToVolume(type, bgVolume, 1000); 
         }
       } else {
-        // 선택되지 않은 오디오: 0으로 페이드 아웃 후 정지
-        const audio = audioRefs.current[type];
         if (audio && !audio.paused && audio.volume > 0) {
             fadeToVolume(type, 0, 1000);
         }
       }
     });
-  }, [weather, selectedAmbience, callStatus, isMounted, hasStarted, bgVolume]);
+  }, [weather, selectedAmbience, callStatus, isMounted, hasStarted, bgVolume, fadeToVolume]);
+
+  // --- Identity Logic ---
+  useEffect(() => {
+    let storedId = localStorage.getItem('spirit_user_id');
+    if (!storedId) {
+        storedId = uuidv4();
+        localStorage.setItem('spirit_user_id', storedId);
+    }
+    setAnonId(storedId);
+  }, []);
+
+  // [Critical Fix] userId 대신 currentUserId 사용
+  const currentUserId = user ? user.id : anonId;
+
+  // --- Continuity: Settings ---
+  useEffect(() => {
+    const savedBgVol = localStorage.getItem('bamboo_bg_volume');
+    const savedVoiceVol = localStorage.getItem('bamboo_voice_volume');
+    const savedAmbience = localStorage.getItem('bamboo_ambience') as WeatherType | null;
+
+    if (savedBgVol) setBgVolume(parseFloat(savedBgVol));
+    if (savedVoiceVol) setVoiceVolume(parseFloat(savedVoiceVol));
+    if (savedAmbience) {
+        setSelectedAmbience(savedAmbience);
+        setWeather(savedAmbience); 
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('bamboo_bg_volume', bgVolume.toString());
+  }, [bgVolume]);
+
+  useEffect(() => {
+    localStorage.setItem('bamboo_voice_volume', voiceVolume.toString());
+  }, [voiceVolume]);
 
   const changeAmbience = (type: WeatherType) => {
     if (selectedAmbience === type) return;
     triggerLight();
     setSelectedAmbience(type);
     setWeather(type);
+    localStorage.setItem('bamboo_ambience', type);
   };
 
   const fetchMemories = useCallback(async (uid: string) => {
@@ -207,10 +236,8 @@ export function useBambooEngine() {
     triggerLight();
     initAudio(); 
     playMagicDust();
-    
-    // 시작 시 강제 재생 (bgVolume 적용)
     const currentAudioKey = selectedAmbience || 'clear';
-    fadeToVolume(currentAudioKey, bgVolume, 2000); // 2초 동안 천천히 시작
+    fadeToVolume(currentAudioKey, bgVolume, 2000); 
   };
 
   const shareMemory = useCallback(async (memory: Memory) => {
@@ -299,15 +326,15 @@ export function useBambooEngine() {
     else setSoulLevel(4);
   }, [resonance]);
 
+  // [Critical Fix] Init Effect: userId -> currentUserId로 변경
   useEffect(() => {
     setIsMounted(true);
     checkTimeOfDay();
     const interval = setInterval(checkTimeOfDay, 60000);
 
-    let storedId = localStorage.getItem('spirit_user_id');
-    if (!storedId) { storedId = uuidv4(); localStorage.setItem('spirit_user_id', storedId); }
-    setUserId(storedId);
-    fetchMemories(storedId);
+    if (currentUserId) {
+        fetchMemories(currentUserId);
+    }
 
     if (!VAPI_PUBLIC_KEY) return;
     const vapi = new Vapi(VAPI_PUBLIC_KEY);
@@ -319,7 +346,7 @@ export function useBambooEngine() {
       const messages = [ "비가 그치면 땅이 더 단단해질 거야.", "언제든 여기서 기다릴게.", "오늘 밤은 푹 잘 수 있을 거야.", "바람이 네 걱정을 가져갔어." ];
       setSpiritMessage(messages[Math.floor(Math.random() * messages.length)]);
       checkTimeOfDay(); 
-      if (userId) saveFallbackMemory(userId); 
+      if (currentUserId) saveFallbackMemory(currentUserId); // [Fix] currentUserId
     });
     vapi.on('error', (e: any) => {
         console.log("Vapi Connection Closed (Silence/Error):", e);
@@ -346,11 +373,13 @@ export function useBambooEngine() {
       });
 
     return () => { clearInterval(interval); try { vapi.stop(); vapi.removeAllListeners(); } catch (e) {} };
-  }, [volumeMotion, weather, userId, fetchMemories, checkTimeOfDay, triggerLight, triggerMedium, selectedAmbience]);
+  }, [volumeMotion, weather, currentUserId, fetchMemories, checkTimeOfDay, triggerLight, triggerMedium, selectedAmbience]);
 
   const toggleCall = () => {
     if (callStatus === 'idle') {
-      triggerMedium(); setCallStatus('connecting'); vapiRef.current?.start(ASSISTANT_ID, { metadata: { userId: userId } });
+      triggerMedium(); setCallStatus('connecting'); 
+      // [Fix] userId -> currentUserId
+      vapiRef.current?.start(ASSISTANT_ID, { metadata: { userId: currentUserId } }); 
     } else {
       triggerLight(); vapiRef.current?.stop(); setTimeout(() => setCallStatus('idle'), 500);
     }
@@ -379,6 +408,7 @@ export function useBambooEngine() {
     isBreathing, toggleBreathing,
     playPaperRustle, playMagicDust,
     triggerLight, selectedAmbience, changeAmbience, initAudio,
-    isDaytime, bgVolume, setBgVolume, voiceVolume, setVoiceVolume
+    isDaytime, bgVolume, setBgVolume, voiceVolume, setVoiceVolume,
+    user, signInWithGoogle, signOut // signInWithKakao 제거
   };
 }
