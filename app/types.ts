@@ -1,5 +1,6 @@
 // app/types.ts
 export type WeatherType = 'clear' | 'rain' | 'snow' | 'ember';
+export type CallStatus = 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'processing';
 
 export interface Particle {
   id: number;
@@ -19,7 +20,13 @@ export interface Memory {
   y?: number;
 }
 
-export type CallStatus = 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'processing';
+// [New] 소리 테마 정의
+export interface SoundTheme {
+    id: WeatherType; // 기존 오디오 키(clear, rain, snow, ember) 재사용
+    name: string;
+    icon: any; // Lucide Icon Component
+    unlockLevel: number; // 해금 레벨
+  }
 
 // 테마 색상 정의
 export const TIME_THEMES = {

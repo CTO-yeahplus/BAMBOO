@@ -18,6 +18,22 @@ export function useSoundEngine() {
     }
   }, []);
 
+  // [New] 데스크탑 오디오 정책 우회를 위한 초기화 함수
+  const initAudio = useCallback(() => {
+    resumeContext();
+    // 무음 오실레이터를 한 번 재생하여 오디오 엔진을 'User Interacted' 상태로 만듦
+    const ctx = audioCtxRef.current;
+    if (ctx) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        gain.gain.value = 0; // 소리 안 나게
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(0);
+        osc.stop(0.1);
+    }
+  }, [resumeContext]);
+
   // 1. Water Drop (이슬): 맑고 투명한 사인파의 피치 하강
   const playWaterDrop = useCallback(() => {
     resumeContext();
@@ -149,5 +165,5 @@ export function useSoundEngine() {
     }
   }, [resumeContext]);
 
-  return { playWaterDrop, playWindChime, playPaperRustle, playMagicDust };
+  return { initAudio, playWaterDrop, playWindChime, playPaperRustle, playMagicDust };
 }
