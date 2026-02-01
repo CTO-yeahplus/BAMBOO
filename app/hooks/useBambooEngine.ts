@@ -1,13 +1,14 @@
 // app/hooks/useBambooEngine.ts
 import { useState, useEffect, useRef, useCallback } from 'react';
-// [New] MouseEvent 타입 추가
 import { useMotionValue, useSpring, useTransform } from 'framer-motion';
 // @ts-ignore
 import Vapi from '@vapi-ai/web';
 import { v4 as uuidv4 } from 'uuid';
-import html2canvas from 'html2canvas'; // import 유지
+import html2canvas from 'html2canvas';
 import { createClient } from '@supabase/supabase-js';
 import { WeatherType, CallStatus, TIME_THEMES, EMOTION_COLORS, Memory } from '../types';
+import { useSoundEngine } from './useSoundEngine'; 
+import { useHaptic } from './useHaptic'; // [New] Haptic 추가
 
 const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || '';
 const ASSISTANT_ID = process.env.NEXT_PUBLIC_ASSISTANT_ID || '';
@@ -15,6 +16,13 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const DAILY_QUOTES = [
+  "천천히 가도 괜찮아, 방향만 맞다면.", "비바람이 불어야 뿌리가 단단해지는 법이야.",
+  "너는 존재만으로도 충분히 아름다워.", "잠시 멈춰서 숨을 고르는 것도 용기야.",
+  "어둠은 별을 빛나게 할 뿐, 너를 삼키지 못해.", "오늘 흘린 땀은 내일의 웃음이 될 거야.",
+  "가장 깊은 밤이 지나야 새벽이 온다.", "너의 속도로 걸어가도 돼."
+];
 
 export function useBambooEngine() {
   // --- State ---
@@ -30,48 +38,43 @@ export function useBambooEngine() {
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
 
+  // Gamification & Dew
+  const [resonance, setResonance] = useState(0); 
+  const [soulLevel, setSoulLevel] = useState(1);
+  const [hasCollectedDew, setHasCollectedDew] = useState(true);
+  const [dailyQuote, setDailyQuote] = useState<string | null>(null);
+
+  // Breathing Mode
+  const [isBreathing, setIsBreathing] = useState(false);
+
+  // Engines
+  const { playWaterDrop, playWindChime, playPaperRustle, playMagicDust } = useSoundEngine();
+  const { triggerLight, triggerMedium, triggerBreathing } = useHaptic(); // [New] Haptic Engine
+
   // --- Animation Values ---
   const volumeMotion = useMotionValue(0);
   const springVolume = useSpring(volumeMotion, { stiffness: 300, damping: 30 });
   const blurValue = useTransform(springVolume, (v) => `blur(${(1 - v) * 10}px)`);
   const opacityValue = useTransform(springVolume, (v) => 1 - v);
   const barWidth = useTransform(springVolume, (v) => `${v * 100}%`);
-
-  // [New] Parallax Motion Values (마우스 위치 -1 ~ 1 정규화)
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
-  // [New] Mouse Move Handler
   const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
-    // 화면 중앙을 0,0으로 하고 -1 ~ 1 사이 값으로 정규화
     const { innerWidth, innerHeight } = window;
     const x = (e.clientX / innerWidth) * 2 - 1;
     const y = (e.clientY / innerHeight) * 2 - 1;
-    
     mouseX.set(x);
     mouseY.set(y);
   }, [mouseX, mouseY]);
 
-  // [Fix] motionValues 객체 미리 정의
-  const motionValues = {
-    blurValue,
-    opacityValue,
-    barWidth,
-    springVolume,
-    mouseX, // [New] 내보내기
-    mouseY  // [New] 내보내기
-  };
-
-  // --- Refs ---
+  const motionValues = { blurValue, opacityValue, barWidth, springVolume, mouseX, mouseY };
   const vapiRef = useRef<any>(null);
-  const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({
-    clear: null, rain: null, snow: null, ember: null,
-  });
+  const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({ clear: null, rain: null, snow: null, ember: null });
 
   // --- Helpers ---
   const checkTimeOfDay = useCallback(() => {
-    const now = new Date();
-    const hour = now.getHours();
+    const hour = new Date().getHours();
     let theme = TIME_THEMES.night;
     if (hour >= 5 && hour < 7) theme = TIME_THEMES.dawn;
     else if (hour >= 7 && hour < 17) theme = TIME_THEMES.day;
@@ -85,24 +88,52 @@ export function useBambooEngine() {
     if (!uid) return;
     const { data } = await supabase.from('memories').select('*').eq('user_id', uid).order('created_at', { ascending: false });
     if (data) {
-      setMemories(data.map((m: any) => ({
-        ...m, x: 10 + Math.random() * 80, y: 15 + Math.random() * 60,
-      })));
+      setMemories(data.map((m: any) => {
+        let detectedEmotion: any = 'neutral';
+        const text = m.summary.toLowerCase();
+        if (text.includes('슬프') || text.includes('울') || text.includes('sad')) detectedEmotion = 'sadness';
+        else if (text.includes('화') || text.includes('짜증') || text.includes('anger')) detectedEmotion = 'anger';
+        else if (text.includes('외로') || text.includes('혼자') || text.includes('lonely')) detectedEmotion = 'loneliness';
+        else {
+           const randomEmotions = ['sadness', 'anger', 'loneliness', 'neutral'];
+           detectedEmotion = randomEmotions[m.id % randomEmotions.length];
+        }
+        return { ...m, emotion: m.emotion || detectedEmotion, x: 10 + Math.random() * 80, y: 15 + Math.random() * 60 };
+      }));
     }
   }, []);
 
+  const saveFallbackMemory = async (uid: string) => {
+    const hour = new Date().getHours();
+    let title = "밤하늘에 남긴 이야기";
+    if (hour >= 5 && hour < 11) title = "새벽의 속삭임";
+    else if (hour >= 11 && hour < 17) title = "오후의 대화";
+    else if (hour >= 17 && hour < 20) title = "노을 진 숲에서의 기억";
+
+    const emotions = ['neutral', 'happy', 'sadness', 'loneliness'];
+    const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
+
+    await supabase.from('memories').insert({
+        user_id: uid,
+        summary: title,
+        emotion: randomEmotion 
+    });
+    fetchMemories(uid);
+  };
+
   const startExperience = () => {
     setHasStarted(true);
+    triggerLight(); // [Haptic] 입장 진동
+    playMagicDust(); 
     const currentAudio = audioRefs.current['clear'];
     if (currentAudio) {
       currentAudio.volume = 0;
       currentAudio.play().then(() => {
-        currentAudio.animate([{ volume: 0 }, { volume: 0.2 }], { duration: 3000, fill: 'forwards' });
+        currentAudio.animate([{ volume: 0 }, { volume: 0.05 }], { duration: 3000, fill: 'forwards' });
       }).catch(e => console.log("Audio play failed", e));
     }
   };
 
-  // 캡처, 삭제 함수들
   const shareMemory = useCallback(async (memory: Memory) => {
     const elementId = `memory-card-${memory.id}`;
     const element = document.getElementById(elementId);
@@ -120,22 +151,85 @@ export function useBambooEngine() {
 
   const deleteMemory = useCallback(async (id: number) => {
     if (!confirm("이 기억을 정말 바람에 날려보낼까?")) return;
+    triggerMedium(); // [Haptic] 삭제 확인
     setIsDeleting(id);
     try {
       const { error } = await supabase.from('memories').delete().eq('id', id);
       if (error) throw error;
       setMemories((prev) => prev.filter((m) => m.id !== id));
     } catch (e) { console.error("Failed to delete:", e); alert("실패했어. 다시 시도해줘."); } finally { setIsDeleting(null); }
+  }, [triggerMedium]);
+
+  const toggleBreathing = () => {
+    triggerLight(); // [Haptic] 모드 전환
+    playWindChime();
+    setIsBreathing(prev => !prev);
+  };
+
+  const collectDew = useCallback(() => {
+    triggerMedium(); // [Haptic] 이슬 터짐 (톡!)
+    playWaterDrop();
+    setResonance(prev => {
+        const next = prev + 50;
+        localStorage.setItem('spirit_resonance', next.toString());
+        return next;
+    });
+    const randomQuote = DAILY_QUOTES[Math.floor(Math.random() * DAILY_QUOTES.length)];
+    setDailyQuote(randomQuote);
+    const today = new Date().toDateString();
+    localStorage.setItem('last_dew_date', today);
+    setHasCollectedDew(true);
+    setTimeout(() => setDailyQuote(null), 5000);
+  }, [playWaterDrop, triggerMedium]);
+
+  // [New] Breathing Haptic Loop
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isBreathing) {
+      triggerBreathing(); // 시작 시 한번
+      interval = setInterval(() => {
+        triggerBreathing();
+      }, 9500); // 호흡 주기(약 19초)의 절반(들이마실때, 내뱉을때) 즈음에 맞춰 진동
+    }
+    return () => clearInterval(interval);
+  }, [isBreathing, triggerBreathing]);
+
+  useEffect(() => {
+    const savedResonance = localStorage.getItem('spirit_resonance');
+    if (savedResonance) setResonance(parseInt(savedResonance));
+    const lastCollected = localStorage.getItem('last_dew_date');
+    const today = new Date().toDateString();
+    setHasCollectedDew(lastCollected === today);
   }, []);
 
-  // --- Audio Logic ---
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (callStatus === 'active' || callStatus === 'speaking' || callStatus === 'listening') {
+      interval = setInterval(() => {
+        setResonance((prev) => {
+          const next = prev + 1;
+          localStorage.setItem('spirit_resonance', next.toString());
+          return next;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [callStatus]);
+
+  useEffect(() => {
+    if (resonance < 60) setSoulLevel(1);
+    else if (resonance < 300) setSoulLevel(2);
+    else if (resonance < 600) setSoulLevel(3);
+    else setSoulLevel(4);
+  }, [resonance]);
+
   useEffect(() => {
     if (!isMounted || !hasStarted || callStatus === 'idle') return;
     Object.entries(audioRefs.current).forEach(([key, audio]) => {
       if (!audio) return;
       if (key === weather) {
         audio.play().catch(() => {});
-        audio.animate([{ volume: audio.volume }, { volume: 0.2 }], { duration: 2000, fill: 'forwards' });
+        audio.animate([{ volume: audio.volume }, { volume: 0.05 }], { duration: 2000, fill: 'forwards' });
       } else if (!audio.paused) {
         audio.animate([{ volume: audio.volume }, { volume: 0 }], { duration: 2000, fill: 'forwards' }).onfinish = () => {
           audio.pause(); audio.currentTime = 0;
@@ -144,11 +238,10 @@ export function useBambooEngine() {
     });
   }, [weather, callStatus, isMounted, hasStarted]);
 
-  // --- Init ---
   useEffect(() => {
     setIsMounted(true);
     checkTimeOfDay();
-    const interval = setInterval(checkTimeOfDay, 60000); // 1분마다 시간 체크
+    const interval = setInterval(checkTimeOfDay, 60000);
 
     let storedId = localStorage.getItem('spirit_user_id');
     if (!storedId) { storedId = uuidv4(); localStorage.setItem('spirit_user_id', storedId); }
@@ -159,14 +252,30 @@ export function useBambooEngine() {
     const vapi = new Vapi(VAPI_PUBLIC_KEY);
     vapiRef.current = vapi;
 
-    vapi.on('call-start', () => { setCallStatus('active'); setSpiritMessage(null); });
+    vapi.on('call-start', () => { 
+        triggerMedium(); // [Haptic] 통화 시작
+        setCallStatus('active'); 
+        setSpiritMessage(null); 
+        setIsBreathing(false); 
+    });
+
     vapi.on('call-end', () => {
+      triggerLight(); // [Haptic] 통화 종료
       setCallStatus('idle'); volumeMotion.set(0);
       const messages = [ "비가 그치면 땅이 더 단단해질 거야.", "언제든 여기서 기다릴게.", "오늘 밤은 푹 잘 수 있을 거야.", "바람이 네 걱정을 가져갔어." ];
       setSpiritMessage(messages[Math.floor(Math.random() * messages.length)]);
       checkTimeOfDay(); 
-      if (userId) fetchMemories(userId);
+      if (userId) saveFallbackMemory(userId); 
     });
+
+    vapi.on('error', (e: any) => {
+        console.log("Vapi Connection Closed (Silence/Error):", e);
+        setCallStatus('idle'); 
+        volumeMotion.set(0);
+        setSpiritMessage("바람이 잠시 멈추었어. 다시 말을 걸어줄래?");
+        checkTimeOfDay();
+    });
+
     vapi.on('volume-level', (volume: number) => volumeMotion.set(Math.min(volume * 2.5, 1)));
     vapi.on('speech-start', () => setCallStatus('listening'));
     vapi.on('speech-end', () => setCallStatus('processing'));
@@ -184,15 +293,15 @@ export function useBambooEngine() {
       });
 
     return () => { clearInterval(interval); try { vapi.stop(); vapi.removeAllListeners(); } catch (e) {} };
-  }, [volumeMotion, weather, userId, fetchMemories, checkTimeOfDay]);
+  }, [volumeMotion, weather, userId, fetchMemories, checkTimeOfDay, triggerLight, triggerMedium]);
 
   const toggleCall = () => {
     if (callStatus === 'idle') {
-      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10); 
+      triggerMedium(); // [Haptic] 시작 버튼 클릭
       setCallStatus('connecting');
       vapiRef.current?.start(ASSISTANT_ID, { metadata: { userId: userId } });
     } else {
-      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10); 
+      triggerLight(); // [Haptic] 종료 버튼 클릭
       vapiRef.current?.stop();
       setTimeout(() => setCallStatus('idle'), 500);
     }
@@ -215,6 +324,11 @@ export function useBambooEngine() {
     callStatus, backgroundGradient, weather, spiritMessage, memories,
     toggleCall, getStatusText, audioRefs, motionValues,
     capturingId, shareMemory, deleteMemory, isDeleting,
-    showEasterEgg, handleMouseMove // [New] 내보내기
+    showEasterEgg, handleMouseMove,
+    resonance, soulLevel,
+    hasCollectedDew, collectDew, dailyQuote,
+    isBreathing, toggleBreathing,
+    playPaperRustle, playMagicDust,
+    triggerLight // [New] Page에서 쓰기 위해 내보냄
   };
 }

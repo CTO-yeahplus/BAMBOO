@@ -14,6 +14,7 @@ export interface Memory {
   id: number;
   summary: string;
   created_at: string;
+  emotion?: 'sadness' | 'anger' | 'loneliness' | 'happy' | 'neutral'; // 감정 타입 추가
   x?: number;
   y?: number;
 }
