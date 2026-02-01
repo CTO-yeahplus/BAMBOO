@@ -3,7 +3,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useMotionValue, useSpring, useTransform } from 'framer-motion';
 // @ts-ignore
 import Vapi from '@vapi-ai/web';
-import { v4 as uuidv4 } from 'uuid';
 import html2canvas from 'html2canvas';
 import { createClient } from '@supabase/supabase-js';
 import { WeatherType, CallStatus, TIME_THEMES, EMOTION_COLORS, Memory } from '../types';
@@ -40,10 +39,10 @@ export function useBambooEngine() {
   const [isDaytime, setIsDaytime] = useState(false);
 
   // Auth & Identity
-  const { user, signInWithGoogle, signOut } = useAuth(); // signInWithKakao 제거
-  const [anonId, setAnonId] = useState<string>('');
+  const { user, isPremium, signInWithGoogle, signOut } = useAuth();
+  // const [anonId, setAnonId] = useState<string>(''); // [Removed] 익명 ID 제거
 
-  // Volume States (기본값 설정)
+  // Volume States
   const [bgVolume, setBgVolume] = useState(0.5);
   const [voiceVolume, setVoiceVolume] = useState(1.0);
 
@@ -138,13 +137,10 @@ export function useBambooEngine() {
   // --- Main Audio Logic ---
   useEffect(() => {
     if (!isMounted || !hasStarted) return;
-    
     const targetKey = selectedAmbience || weather;
-
     Object.keys(audioRefs.current).forEach((key) => {
       const type = key as WeatherType;
       const audio = audioRefs.current[type];
-      
       if (type === targetKey) {
         if (audio && (audio.paused || Math.abs(audio.volume - bgVolume) > 0.05)) {
              fadeToVolume(type, bgVolume, 1000); 
@@ -158,19 +154,10 @@ export function useBambooEngine() {
   }, [weather, selectedAmbience, callStatus, isMounted, hasStarted, bgVolume, fadeToVolume]);
 
   // --- Identity Logic ---
-  useEffect(() => {
-    let storedId = localStorage.getItem('spirit_user_id');
-    if (!storedId) {
-        storedId = uuidv4();
-        localStorage.setItem('spirit_user_id', storedId);
-    }
-    setAnonId(storedId);
-  }, []);
+  // [Correct] user가 있으면 user.id, 없으면 null
+  const currentUserId = user ? user.id : null;
 
-  // [Critical Fix] userId 대신 currentUserId 사용
-  const currentUserId = user ? user.id : anonId;
-
-  // --- Continuity: Settings ---
+  // --- Continuity ---
   useEffect(() => {
     const savedBgVol = localStorage.getItem('bamboo_bg_volume');
     const savedVoiceVol = localStorage.getItem('bamboo_voice_volume');
@@ -184,13 +171,8 @@ export function useBambooEngine() {
     }
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('bamboo_bg_volume', bgVolume.toString());
-  }, [bgVolume]);
-
-  useEffect(() => {
-    localStorage.setItem('bamboo_voice_volume', voiceVolume.toString());
-  }, [voiceVolume]);
+  useEffect(() => { localStorage.setItem('bamboo_bg_volume', bgVolume.toString()); }, [bgVolume]);
+  useEffect(() => { localStorage.setItem('bamboo_voice_volume', voiceVolume.toString()); }, [voiceVolume]);
 
   const changeAmbience = (type: WeatherType) => {
     if (selectedAmbience === type) return;
@@ -214,28 +196,46 @@ export function useBambooEngine() {
            const randomEmotions = ['sadness', 'anger', 'loneliness', 'neutral'];
            detectedEmotion = randomEmotions[m.id % randomEmotions.length];
         }
+        // DB에서 가져온 기억은 랜덤 위치에 뿌리되, 매번 바뀌지 않게 하려면 DB에 x,y도 저장해야 함.
+        // 현재는 임시로 랜덤 위치 생성
         return { ...m, emotion: m.emotion || detectedEmotion, x: 10 + Math.random() * 80, y: 15 + Math.random() * 60 };
       }));
     }
   }, []);
 
   const saveFallbackMemory = async (uid: string) => {
+    const isTimeCapsule = Math.random() > 0.7; 
+    let unlockDate = null;
     const hour = new Date().getHours();
+    const emotions = ['neutral', 'happy', 'sadness', 'loneliness'];
+    const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
     let title = "밤하늘에 남긴 이야기";
     if (hour >= 5 && hour < 11) title = "새벽의 속삭임";
     else if (hour >= 11 && hour < 17) title = "오후의 대화";
     else if (hour >= 17 && hour < 20) title = "노을 진 숲에서의 기억";
-    const emotions = ['neutral', 'happy', 'sadness', 'loneliness'];
-    const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
-    await supabase.from('memories').insert({ user_id: uid, summary: title, emotion: randomEmotion });
+        if (isTimeCapsule) {
+        // 1분 뒤에 열리는 타임캡슐 (테스트를 위해 짧게 설정)
+        const date = new Date();
+        date.setMinutes(date.getMinutes() + 1); 
+        unlockDate = date.toISOString();
+    }
+    await supabase.from('memories').insert({ 
+        user_id: uid, 
+        summary: title, 
+        emotion: randomEmotion,
+        unlock_date: unlockDate // [New]
+    });
     fetchMemories(uid);
   };
 
+  // [Fix] 로그인 체크 제거 (누구나 숲에 들어올 수 있음)
   const startExperience = () => {
     setHasStarted(true);
     triggerLight();
     initAudio(); 
     playMagicDust();
+    
+    // 오디오 재생
     const currentAudioKey = selectedAmbience || 'clear';
     fadeToVolume(currentAudioKey, bgVolume, 2000); 
   };
@@ -288,6 +288,7 @@ export function useBambooEngine() {
     setTimeout(() => setDailyQuote(null), 5000);
   }, [playWaterDrop, triggerMedium]);
 
+  // Effects
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isBreathing) {
@@ -326,14 +327,17 @@ export function useBambooEngine() {
     else setSoulLevel(4);
   }, [resonance]);
 
-  // [Critical Fix] Init Effect: userId -> currentUserId로 변경
+  // Init & ID Change Effect
   useEffect(() => {
     setIsMounted(true);
     checkTimeOfDay();
     const interval = setInterval(checkTimeOfDay, 60000);
 
+    // 로그인 상태가 바뀌면(currentUserId 변경 시) 기억을 다시 불러옴
     if (currentUserId) {
         fetchMemories(currentUserId);
+    } else {
+        setMemories([]); // 로그아웃 시 기억 비우기
     }
 
     if (!VAPI_PUBLIC_KEY) return;
@@ -346,7 +350,8 @@ export function useBambooEngine() {
       const messages = [ "비가 그치면 땅이 더 단단해질 거야.", "언제든 여기서 기다릴게.", "오늘 밤은 푹 잘 수 있을 거야.", "바람이 네 걱정을 가져갔어." ];
       setSpiritMessage(messages[Math.floor(Math.random() * messages.length)]);
       checkTimeOfDay(); 
-      if (currentUserId) saveFallbackMemory(currentUserId); // [Fix] currentUserId
+      // 통화 종료 시 기억 저장 (로그인 유저만)
+      if (currentUserId) saveFallbackMemory(currentUserId); 
     });
     vapi.on('error', (e: any) => {
         console.log("Vapi Connection Closed (Silence/Error):", e);
@@ -376,9 +381,15 @@ export function useBambooEngine() {
   }, [volumeMotion, weather, currentUserId, fetchMemories, checkTimeOfDay, triggerLight, triggerMedium, selectedAmbience]);
 
   const toggleCall = () => {
+    // [Security] 대화 시작은 로그인 필수
+    if (!currentUserId) {
+        // UI가 이미 버튼을 숨기고 있지만, 안전장치로 추가
+        alert("로그인이 필요합니다."); 
+        return;
+    }
+
     if (callStatus === 'idle') {
       triggerMedium(); setCallStatus('connecting'); 
-      // [Fix] userId -> currentUserId
       vapiRef.current?.start(ASSISTANT_ID, { metadata: { userId: currentUserId } }); 
     } else {
       triggerLight(); vapiRef.current?.stop(); setTimeout(() => setCallStatus('idle'), 500);
@@ -409,6 +420,6 @@ export function useBambooEngine() {
     playPaperRustle, playMagicDust,
     triggerLight, selectedAmbience, changeAmbience, initAudio,
     isDaytime, bgVolume, setBgVolume, voiceVolume, setVoiceVolume,
-    user, signInWithGoogle, signOut // signInWithKakao 제거
+    user, isPremium, signInWithGoogle, signOut
   };
 }
