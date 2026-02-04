@@ -1,6 +1,10 @@
 // app/types.ts
+
 export type WeatherType = 'clear' | 'rain' | 'snow' | 'ember';
 export type CallStatus = 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'processing';
+
+// [Fix] SeasonType 추가
+export type SeasonType = 'spring' | 'summer' | 'autumn' | 'winter';
 
 export interface Particle {
   id: number;
@@ -15,20 +19,12 @@ export interface Memory {
   id: number;
   summary: string;
   created_at: string;
-  emotion?: 'sadness' | 'anger' | 'loneliness' | 'happy' | 'neutral'; // 감정 타입 추가
+  emotion?: 'sadness' | 'anger' | 'loneliness' | 'happy' | 'neutral';
   x?: number;
   y?: number;
+  unlock_date?: string; // For Time Capsule
 }
 
-// [New] 소리 테마 정의
-export interface SoundTheme {
-    id: WeatherType; // 기존 오디오 키(clear, rain, snow, ember) 재사용
-    name: string;
-    icon: any; // Lucide Icon Component
-    unlockLevel: number; // 해금 레벨
-  }
-
-// 테마 색상 정의
 export const TIME_THEMES = {
   dawn: ['from-slate-900', 'via-purple-900', 'to-black'],
   day: ['from-sky-900', 'via-emerald-900', 'to-black'],
@@ -44,3 +40,23 @@ export const EMOTION_COLORS = {
   family: ['from-brown-950', 'via-gray-950', 'to-black'],
   work: ['from-zinc-950', 'via-slate-950', 'to-black'],
 };
+
+// Artifact Types & Constants
+export type ArtifactType = 'aura' | 'head';
+
+export interface Artifact {
+    id: string;
+    type: ArtifactType;
+    name: string;
+    description: string;
+    cost: number;
+    icon: string;
+}
+
+export const ARTIFACTS: Artifact[] = [
+    { id: 'aura_firefly', type: 'aura', name: "Forest Whispers", description: "작은 숲의 정령들이 주위를 맴돕니다.", cost: 0, icon: "✨" }, 
+    { id: 'aura_moonlight', type: 'aura', name: "Lunar Veil", description: "달빛의 가호가 깃듭니다.", cost: 150, icon: "🌙" },
+    { id: 'aura_ember', type: 'aura', name: "Warmth of Hearth", description: "따뜻한 온기가 감돕니다.", cost: 300, icon: "🔥" },
+    { id: 'head_flower', type: 'head', name: "Bloom Crown", description: "봄에 핀 첫 꽃으로 만든 화관.", cost: 100, icon: "🌸" },
+    { id: 'head_fox', type: 'head', name: "Mystic Mask", description: "오래된 여우 가면.", cost: 500, icon: "🦊" },
+];

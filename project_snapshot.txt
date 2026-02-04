@@ -1,6 +1,6 @@
 
 # PROJECT: Bamboo Forest (The Soul Shelter)
-# DATE: 2026-02-03 00:24:44
+# DATE: 2026-02-03 23:12:21
 # STATUS: Golden Master (Feature Complete)
 
 # 1. KEY FEATURES IMPLEMENTED:
@@ -52,6 +52,7 @@
         utils/
             moonPhase.ts
         hooks/
+            useParallax.ts
             useHaptic.ts
             useAuth.ts
             useSoundEngine.ts
@@ -7271,17 +7272,15 @@ export default function RootLayout({
 ```tsx
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+// [Fix] React default import 추가 (React.KeyboardEvent 사용을 위해)
+import React, { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence, useSpring, useMotionValue, PanInfo, useTransform } from 'framer-motion';
-import { Book, X, Star, Share2, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Trees, CloudRain, Flame, Waves, Lock, Sun, Settings2, Volume2, Mic, LogIn, LogOut, Hourglass } from 'lucide-react';
-import { useBambooEngine } from './hooks/useBambooEngine';
+import { Book, X, Star, Share2, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Trees, CloudRain, Flame, Waves, Lock, Sun, Settings2, Volume2, Mic, LogIn, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, ArrowUp, Keyboard, SendHorizontal, Palette, Gem, Check } from 'lucide-react';import { useBambooEngine } from './hooks/useBambooEngine';
 import { useRipple } from './hooks/useRipple';
 import { Particle, Memory } from './types';
 import { getMoonPhase, getMoonIconPath } from './utils/moonPhase';
 
-// --- [Type Definition] Local extension for Visuals ---
-// x, y 좌표와 unlock_date가 반드시 존재한다고 가정하는 확장 타입
 type VisualMemory = Memory & { x: number; y: number; unlock_date?: string };
 
 const WHISPERS = ["오늘 하루는 어땠어?", "누구에게도 말 못 할 고민이 있니?", "그냥 빗소리만 듣고 싶다면, 그래도 돼.", "무거운 짐은 잠시 여기에 내려놓아.", "바람이 네 이야기를 기다리고 있어.", "괜찮아, 아무 말 안 해도 돼.", "어제보다 오늘 마음은 좀 어때?"];
@@ -7299,7 +7298,6 @@ const SpiderLily = ({ className }: { className?: string }) => ( <svg viewBox="0 
 const Moonflower = ({ className }: { className?: string }) => ( <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.5"><path d="M12 22c4.97 0 9-4.03 9-9s-4.03-9-9-9-9 4.03-9 9 4.03 9 9 9z" className="text-white/30 fill-white/10" style={{ filter: 'blur(5px)' }} /><path d="M12 6L13.5 10.5L18 12L13.5 13.5L12 18L10.5 13.5L6 12L10.5 10.5L12 6Z" className="fill-yellow-100 text-yellow-100" /></svg>);
 const MemoryFlower = ({ emotion, isSelected }: { emotion?: string; isSelected: boolean }) => { const glowClass = isSelected ? "drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]" : "drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]"; switch (emotion) { case 'sadness': return <Hydrangea className={`w-8 h-8 ${glowClass} transition-all duration-500`} />; case 'anger': return <SpiderLily className={`w-8 h-8 ${glowClass} transition-all duration-500`} />; default: return <Moonflower className={`w-8 h-8 ${glowClass} transition-all duration-500`} />; }};
 
-// [New] Golden Cocoon Component (Time Capsule)
 const GoldenCocoon = ({ isLocked }: { isLocked: boolean }) => (
   <div className="relative group">
     <div className="absolute inset-0 bg-yellow-500/30 blur-xl rounded-full animate-pulse" />
@@ -7321,7 +7319,6 @@ const GoldenCocoon = ({ isLocked }: { isLocked: boolean }) => (
   </div>
 );
 
-// [Fix] ConstellationLayer using VisualMemory type
 const ConstellationLayer = ({ memories }: { memories: Memory[] }) => {
   const sortedMemories = useMemo(() => {
     return [...memories].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -7343,12 +7340,9 @@ const ConstellationLayer = ({ memories }: { memories: Memory[] }) => {
       <defs>
         {sortedMemories.map((memory, index) => {
           if (index === 0) return null;
-          
           const prev = sortedMemories[index - 1] as VisualMemory | undefined;
           const curr = memory as VisualMemory;
-
           if (!prev) return null;
-
           const id = `grad-${prev.id}-${curr.id}`;
           return (
             <linearGradient key={id} id={id} x1={`${prev.x}%`} y1={`${prev.y}%`} x2={`${curr.x}%`} y2={`${curr.y}%`} gradientUnits="userSpaceOnUse">
@@ -7358,44 +7352,104 @@ const ConstellationLayer = ({ memories }: { memories: Memory[] }) => {
           );
         })}
       </defs>
-
       {sortedMemories.map((memory, index) => {
         if (index === 0) return null;
-        
         const prev = sortedMemories[index - 1] as VisualMemory | undefined;
         const curr = memory as VisualMemory;
-
         if (!prev) return null;
-
         const gradId = `grad-${prev.id}-${curr.id}`;
-        
         const isClient = typeof window !== 'undefined';
         const startX = isClient ? prev.x * window.innerWidth / 100 : 0;
         const startY = isClient ? prev.y * window.innerHeight / 100 : 0;
         const endX = isClient ? curr.x * window.innerWidth / 100 : 0;
         const endY = isClient ? curr.y * window.innerHeight / 100 : 0;
-        
         return (
           <motion.g key={`connection-${curr.id}`}>
-            <motion.line 
-                x1={`${prev.x}%`} y1={`${prev.y}%`} 
-                x2={`${curr.x}%`} y2={`${curr.y}%`} 
-                stroke={`url(#${gradId})`} 
-                strokeWidth="1.5" 
-                initial={{ pathLength: 0, opacity: 0 }} 
-                animate={{ pathLength: 1, opacity: 1 }} 
-                transition={{ duration: 2, delay: index * 0.3, ease: "easeInOut" }} 
-            />
-            {isClient && (
-                <motion.circle r="1" fill="white" initial={{ offsetDistance: "0%" }} animate={{ offsetDistance: "100%" }}>
-                    <animateMotion dur={`${3 + Math.random() * 2}s`} repeatCount="indefinite" path={`M${startX},${startY} L${endX},${endY}`} />
-                </motion.circle>
-            )}
+            <motion.line x1={`${prev.x}%`} y1={`${prev.y}%`} x2={`${curr.x}%`} y2={`${curr.y}%`} stroke={`url(#${gradId})`} strokeWidth="1.5" initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: 2, delay: index * 0.3, ease: "easeInOut" }} />
+            {isClient && (<motion.circle r="1" fill="white" initial={{ offsetDistance: "0%" }} animate={{ offsetDistance: "100%" }}><animateMotion dur={`${3 + Math.random() * 2}s`} repeatCount="indefinite" path={`M${startX},${startY} L${endX},${endY}`} /></motion.circle>)}
           </motion.g>
         );
       })}
     </svg>
   );
+};
+
+const OrbitLayer = ({ memories, onSelect }: { memories: Memory[], onSelect: (m: Memory) => void }) => {
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const orbitPoints = useMemo(() => {
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const day = i + 1;
+      const angle = 0.5 * i; 
+      const radius = 12 + (i * 1.5); 
+      const x = 50 + radius * Math.cos(angle);
+      const y = 50 + radius * Math.sin(angle);
+      const memory = memories.find(m => {
+        const mDate = new Date(m.created_at);
+        return mDate.getDate() === day && mDate.getMonth() === today.getMonth();
+      });
+      const checkDate = new Date(today.getFullYear(), today.getMonth(), day);
+      const moonPhase = getMoonPhase(checkDate);
+      const moonPath = getMoonIconPath(moonPhase);
+      return { day, x, y, memory, moonPath };
+    });
+  }, [memories]);
+
+  const getGlowColor = (emotion?: string) => {
+    switch (emotion) {
+      case 'anger': return 'text-red-400 drop-shadow-[0_0_15px_rgba(248,113,113,0.8)]';
+      case 'sadness': return 'text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.8)]';
+      case 'loneliness': return 'text-gray-300 drop-shadow-[0_0_15px_rgba(209,213,219,0.8)]';
+      case 'happy': return 'text-yellow-300 drop-shadow-[0_0_15px_rgba(253,224,71,0.8)]';
+      default: return 'text-white/20';
+    }
+  };
+
+  return (
+    <div className="absolute inset-0 w-full h-full pointer-events-none">
+      <svg className="absolute inset-0 w-full h-full opacity-10" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <path d={orbitPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')} fill="none" stroke="white" strokeWidth="0.2" strokeDasharray="1,1" />
+      </svg>
+      {orbitPoints.map((point, index) => (
+        <motion.div key={point.day} className="absolute flex flex-col items-center justify-center -translate-x-1/2 -translate-y-1/2 pointer-events-auto" style={{ left: `${point.x}%`, top: `${point.y}%` }} initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: index * 0.03, type: "spring" }}>
+          <button onClick={() => point.memory && onSelect(point.memory)} disabled={!point.memory} className={`group relative p-2 transition-transform hover:scale-125 ${!point.memory ? 'cursor-default' : 'cursor-pointer'}`}>
+            <svg viewBox="0 0 24 24" className={`w-4 h-4 md:w-6 md:h-6 ${point.memory ? getGlowColor(point.memory.emotion) : 'text-white/5'}`}><path d={point.moonPath} fill="currentColor" /></svg>
+            <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[8px] text-white/30 font-mono opacity-0 group-hover:opacity-100 transition-opacity">{point.day}</span>
+            {point.memory && (<div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-max max-w-[120px] bg-black/80 backdrop-blur px-2 py-1 rounded border border-white/10 text-[8px] text-white/80 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none truncate z-50">{point.memory.summary}</div>)}
+          </button>
+        </motion.div>
+      ))}
+    </div>
+  );
+};
+
+// [New] Spirit Visual Components (for Customization)
+const SpiritAura = ({ type }: { type: string | null }) => {
+  if (!type) return null;
+  switch (type) {
+      case 'aura_firefly':
+          return (
+              <div className="absolute inset-0 pointer-events-none">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                      <motion.div key={i} className="absolute w-1 h-1 bg-yellow-200 rounded-full blur-[1px] shadow-[0_0_5px_yellow]" animate={{ x: [Math.random() * 200 - 100, Math.random() * 200 - 100], y: [Math.random() * 200 - 100, Math.random() * 200 - 100], opacity: [0, 1, 0] }} transition={{ duration: 3 + Math.random() * 2, repeat: Infinity, ease: "easeInOut" }} style={{ left: '50%', top: '50%' }} />
+                  ))}
+              </div>
+          );
+      case 'aura_moonlight': return <div className="absolute inset-[-20%] bg-blue-500/20 blur-3xl rounded-full animate-pulse mix-blend-screen pointer-events-none" />;
+      case 'aura_ember': return <div className="absolute inset-[-20%] bg-orange-500/20 blur-3xl rounded-full animate-pulse mix-blend-screen pointer-events-none" />;
+      default: return null;
+  }
+};
+
+const SpiritAccessory = ({ type }: { type: string | null }) => {
+  if (!type) return null;
+  switch (type) {
+      case 'head_flower':
+          return <div className="absolute top-[15%] left-1/2 -translate-x-1/2 w-[60%] h-10 pointer-events-none opacity-80"><div className="flex justify-center gap-1"><span className="text-2xl drop-shadow-lg filter hue-rotate-15">🌸</span><span className="text-xl drop-shadow-lg mt-2">🌼</span><span className="text-2xl drop-shadow-lg filter -hue-rotate-15">🌸</span></div></div>;
+      case 'head_fox':
+          return <div className="absolute top-[20%] left-1/2 -translate-x-1/2 w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center pointer-events-none border border-red-500/30"><div className="absolute top-4 left-3 w-3 h-1 bg-red-500 rounded-full rotate-12" /><div className="absolute top-4 right-3 w-3 h-1 bg-red-500 rounded-full -rotate-12" /><span className="text-3xl mt-1">🦊</span></div>;
+      default: return null;
+  }
 };
 
 export default function BambooForest() {
@@ -7404,14 +7458,18 @@ export default function BambooForest() {
     callStatus, backgroundGradient, weather, spiritMessage, memories,
     toggleCall, getStatusText, audioRefs, motionValues,
     capturingId, shareMemory, deleteMemory, isDeleting,
-    showEasterEgg, handleMouseMove,
-    soulLevel, resonance,
+    showEasterEgg,
+    resonance, soulLevel,
     hasCollectedDew, collectDew, dailyQuote,
     isBreathing, toggleBreathing,
-    playPaperRustle, playMagicDust, triggerLight,
-    selectedAmbience, changeAmbience,
+    playPaperRustle, playMagicDust,
+    triggerLight, selectedAmbience, changeAmbience, initAudio,
     isDaytime, bgVolume, setBgVolume, voiceVolume, setVoiceVolume,
-    user, isPremium, signInWithGoogle, signOut
+    user, isPremium, signInWithGoogle, signOut,
+    showMemoryRitual, setShowMemoryRitual, pendingSummary, setPendingSummary, finalizeMemory,
+    hasWoken, wakeSpirit, showTutorial,
+    isSilentMode, toggleSilentMode, sendTextMessage, // [Check] Ensure these are destructured
+    ownedItems, equippedItems, showAltar, setShowAltar, unlockArtifact, equipArtifact, ARTIFACTS
   } = useBambooEngine();
 
   const { ripples, addRipple } = useRipple();
@@ -7420,6 +7478,9 @@ export default function BambooForest() {
   const [whisperIndex, setWhisperIndex] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [viewMode, setViewMode] = useState<'stars' | 'orbit'>('stars');
+  // [Check] Text Input State
+  const [inputText, setInputText] = useState("");
 
   const moonPhase = useMemo(() => getMoonPhase(new Date()), []);
   const moonPath = getMoonIconPath(moonPhase);
@@ -7435,6 +7496,24 @@ export default function BambooForest() {
   const spiritScale = useTransform(motionValues.springVolume, (v) => 1 + v * 0.15);
   const spiritGlowOpacity = useTransform(motionValues.springVolume, [0, 1], [0, 0.6]);
 
+  // [Fix] Handle text message send
+  const handleSendMessage = () => {
+      if (inputText.trim()) {
+          sendTextMessage(inputText);
+          setInputText("");
+      }
+  };
+
+  // [Fix] Keyboard 'Enter' key with correct type
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleSendMessage();
+      } else {
+          playPaperRustle();
+      }
+  };
+
   useEffect(() => { const interval = setInterval(() => setWhisperIndex((prev) => (prev + 1) % WHISPERS.length), 6000); return () => clearInterval(interval); }, []);
   useEffect(() => { if (callStatus !== 'idle') setShowJournal(false); }, [callStatus]);
   useEffect(() => { if (selectedMemory && !memories.find(m => m.id === selectedMemory.id)) setSelectedMemory(null); }, [memories, selectedMemory]);
@@ -7445,22 +7524,43 @@ export default function BambooForest() {
 
   const handleToggleJournal = () => { playPaperRustle(); triggerLight(); setShowJournal(!showJournal); };
   const handleSelectFlower = (m: Memory) => { playMagicDust(); triggerLight(); setSelectedMemory(m); };
+  
+  const handleSelectMemoryWrapper = (m: Memory) => {
+      const visualMem: VisualMemory = { ...m, x: 50, y: 50 }; 
+      handleSelectFlower(visualMem);
+  };
+
   const handleGlobalClick = (e: React.PointerEvent) => { addRipple(e); };
   const getUserInitial = () => { if (user?.email) return user.email[0].toUpperCase(); return "U"; };
   
   const avatarBorderClass = isPremium ? "border-yellow-400/50 shadow-[0_0_15px_rgba(253,224,71,0.3)]" : "border-white/20";
 
+  const handleSpiritClick = () => {
+      if (!hasWoken && hasStarted) {
+          wakeSpirit();
+      }
+  };
+
   return (
-    <main className="relative flex flex-col items-center justify-center w-full h-screen overflow-hidden bg-black touch-none" onMouseMove={handleMouseMove} onPointerDown={handleGlobalClick}>
+    <main className="relative flex flex-col items-center justify-center w-full h-screen overflow-hidden bg-black touch-none" onMouseMove={(e) => { /* useParallax 내부에서 처리하므로 비움 */ }} onPointerDown={handleGlobalClick}>
       <audio ref={(el) => { audioRefs.current.clear = el; }} src="/sounds/forest_ambience.mp3" loop />
       <audio ref={(el) => { audioRefs.current.rain = el; }} src="/sounds/rain.mp3" loop />
       <audio ref={(el) => { audioRefs.current.snow = el; }} src="/sounds/wind.mp3" loop />
       <audio ref={(el) => { audioRefs.current.ember = el; }} src="/sounds/fire.mp3" loop />
       
       <motion.div className="absolute inset-0 w-full h-full" animate={{ filter: hasStarted ? 'blur(0px)' : 'blur(20px)', opacity: hasStarted ? 1 : 0 }} transition={{ duration: 2 }}>
+        
+        <motion.div 
+            className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-t from-black/80 via-gray-900/50 to-transparent mix-blend-hard-light"
+            animate={{ opacity: hasWoken ? 0 : 1 }}
+            transition={{ duration: 3, ease: "easeInOut" }}
+        />
+
         <motion.div className="absolute inset-[-5%] w-[110%] h-[110%]" style={{ x: bgX, y: bgY }}>
            <motion.div className={`absolute inset-0 bg-gradient-to-b ${backgroundGradient.join(' ')}`} animate={{ opacity: callStatus === 'idle' && !showJournal ? 0.7 : showJournal ? 0.2 : 1 }} transition={{ duration: 2.5 }} />
         </motion.div>
+        
+        {/* Moon */}
         <motion.div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none z-0 mix-blend-screen" style={{ x: moonX, y: moonY }}>
             {isDaytime ? (
                 <div className="relative w-32 h-32 opacity-90"><svg viewBox="0 0 24 24" className="w-full h-full text-orange-100 blur-[1px] drop-shadow-[0_0_30px_rgba(255,200,100,0.8)]"><circle cx="12" cy="12" r="8" fill="currentColor" /></svg><div className="absolute inset-0 bg-orange-200/30 blur-[60px] rounded-full" /></div>
@@ -7478,45 +7578,26 @@ export default function BambooForest() {
           )}
         </AnimatePresence>
 
-        {/* --- Top Right Controls --- */}
+        {/* Top Right Controls */}
         <AnimatePresence>
-            {callStatus === 'idle' && !showJournal && !isBreathing && user && (
+            {hasWoken && callStatus === 'idle' && !showJournal && !isBreathing && user && (
                 <div className="absolute top-8 right-8 z-50 flex flex-col items-end gap-4">
-                    
-                    {/* Time Capsule (Premium Only) */}
                     {isPremium && (
-                        <motion.button 
-                            initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} 
-                            whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} 
-                            className="group cursor-pointer flex flex-col items-center gap-2"
-                            onClick={() => alert("타임 캡슐은 곧 열립니다.")}
-                        >
-                            <div className="relative flex items-center justify-center w-12 h-12 bg-black/40 backdrop-blur-md rounded-full border border-yellow-500/30 shadow-[0_0_20px_rgba(234,179,8,0.2)] group-hover:bg-yellow-500/10 transition-colors">
-                                <Hourglass className="text-yellow-200" size={18} />
-                                <div className="absolute inset-0 bg-yellow-400 rounded-full opacity-10 animate-pulse" />
-                            </div>
+                        <motion.button initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="group cursor-pointer flex flex-col items-center gap-2" onClick={() => alert("타임 캡슐은 곧 열립니다.")}>
+                            <div className="relative flex items-center justify-center w-12 h-12 bg-black/40 backdrop-blur-md rounded-full border border-yellow-500/30 shadow-[0_0_20px_rgba(234,179,8,0.2)] group-hover:bg-yellow-500/10 transition-colors"><Hourglass className="text-yellow-200" size={18} /><div className="absolute inset-0 bg-yellow-400 rounded-full opacity-10 animate-pulse" /></div>
                         </motion.button>
                     )}
-
                     {!hasCollectedDew && (
                         <motion.button initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0 }} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={collectDew} className="group cursor-pointer flex flex-col items-center gap-2">
                             <div className="relative flex items-center justify-center w-12 h-12 bg-black/20 backdrop-blur-md rounded-full border border-white/10 shadow-lg group-hover:bg-white/10 transition-colors"><Droplets className="text-blue-200" size={20} /><div className="absolute inset-0 bg-blue-400 rounded-full opacity-20 animate-ping" /></div>
                         </motion.button>
                     )}
-
-                    <motion.button 
-                        initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} 
-                        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                        onClick={() => { triggerLight(); setShowProfile(!showProfile); }}
-                        className={`flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-md border rounded-full text-white/90 hover:bg-white/20 transition-all shadow-lg overflow-hidden ${avatarBorderClass}`}
-                    >
-                        <span className="text-lg font-bold">{getUserInitial()}</span>
-                    </motion.button>
+                    <motion.button initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { triggerLight(); setShowProfile(!showProfile); }} className={`flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-md border rounded-full text-white/90 hover:bg-white/20 transition-all shadow-lg overflow-hidden ${avatarBorderClass}`}><span className="text-lg font-bold">{getUserInitial()}</span></motion.button>
                 </div>
             )}
         </AnimatePresence>
 
-        {/* --- Profile Overlay --- */}
+        {/* Profile Overlay */}
         <AnimatePresence>
             {showProfile && user && (
                 <motion.div initial={{ opacity: 0, y: -20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20, scale: 0.9 }} className="absolute top-24 right-8 z-50 w-64 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 shadow-2xl origin-top-right">
@@ -7558,64 +7639,47 @@ export default function BambooForest() {
         {/* Journal Layer */}
         <AnimatePresence>
           {showJournal && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm">
-              <ConstellationLayer memories={memories} />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 bg-black/90 backdrop-blur-xl">
               
-              {memories.map((item, index) => {
-                const memory = item as VisualMemory;
-                // [New] Time Capsule Logic
-                const isTimeCapsule = !!memory.unlock_date; 
-                const isLocked = isTimeCapsule && new Date(memory.unlock_date!) > new Date(); 
-
-                return (
-                  <motion.button 
-                      key={memory.id} 
-                      layoutId={`memory-container-${memory.id}`} 
-                      className="absolute flex items-center justify-center group -translate-x-1/2 -translate-y-1/2" 
-                      style={{ top: `${memory.y}%`, left: `${memory.x}%`, zIndex: selectedMemory?.id === memory.id ? 50 : 10 }} 
-                      onClick={() => {
-                          if (isLocked) {
-                              alert(`이 기억은 ${new Date(memory.unlock_date!).toLocaleDateString()}에 깨어납니다.`);
-                          } else {
-                              handleSelectFlower(memory);
-                          }
-                      }}
-                      initial={{ scale: 0, opacity: 0, rotate: -45 }} 
-                      animate={{ 
-                          scale: 1, opacity: 1, 
-                          rotate: isLocked ? 0 : 0, 
-                          y: isLocked ? [0, 3, 0] : 0 
-                      }} 
-                      transition={{ 
-                          default: { delay: index * 0.1, type: "spring", stiffness: 200, damping: 15 },
-                          y: { duration: 4, repeat: Infinity, ease: "easeInOut" } 
-                      }} 
+              <div className="absolute top-8 right-20 z-50 flex gap-2">
+                  <button 
+                      onClick={() => { triggerLight(); setViewMode(viewMode === 'stars' ? 'orbit' : 'stars'); }}
+                      className="p-3 bg-white/10 rounded-full hover:bg-white/20 text-white/70 transition-all flex items-center gap-2 border border-white/5"
                   >
-                    <div className="relative hover:scale-125 transition-transform duration-300">
-                        {isTimeCapsule && isLocked ? (
-                            <GoldenCocoon isLocked={true} />
-                        ) : (
-                            <>
-                                <MemoryFlower emotion={memory.emotion} isSelected={selectedMemory?.id === memory.id} />
-                                <div className={`absolute inset-0 blur-md opacity-40 animate-pulse ${memory.emotion === 'anger' ? 'bg-red-500' : memory.emotion === 'sadness' ? 'bg-blue-500' : 'bg-yellow-200'}`} />
-                            </>
-                        )}
-                    </div>
-                  </motion.button>
-                );
-              })}
+                      {viewMode === 'stars' ? <LayoutGrid size={20} /> : <Star size={20} />}
+                      <span className="text-[10px] uppercase tracking-widest hidden md:block">
+                          {viewMode === 'stars' ? 'Orbit View' : 'Star View'}
+                      </span>
+                  </button>
+              </div>
+
+              {viewMode === 'stars' ? (
+                  <>
+                    <ConstellationLayer memories={memories} />
+                    {memories.map((item, index) => {
+                      const memory = item as VisualMemory;
+                      const isTimeCapsule = !!memory.unlock_date; 
+                      const isLocked = isTimeCapsule && new Date(memory.unlock_date!) > new Date(); 
+                      return (
+                        <motion.button key={memory.id} layoutId={`memory-container-${memory.id}`} className="absolute flex items-center justify-center group -translate-x-1/2 -translate-y-1/2" style={{ top: `${memory.y}%`, left: `${memory.x}%`, zIndex: selectedMemory?.id === memory.id ? 50 : 10 }} 
+                            onClick={() => { if (isLocked) { alert(`이 기억은 ${new Date(memory.unlock_date!).toLocaleDateString()}에 깨어납니다.`); } else { handleSelectFlower(memory); } }}
+                            initial={{ scale: 0, opacity: 0, rotate: -45 }} animate={{ scale: 1, opacity: 1, rotate: isLocked ? 0 : 0, y: isLocked ? [0, 3, 0] : 0 }} transition={{ default: { delay: index * 0.1, type: "spring", stiffness: 200, damping: 15 }, y: { duration: 4, repeat: Infinity, ease: "easeInOut" } }}>
+                          <div className="relative hover:scale-125 transition-transform duration-300">
+                              {isTimeCapsule && isLocked ? ( <GoldenCocoon isLocked={true} /> ) : ( <> <MemoryFlower emotion={memory.emotion} isSelected={selectedMemory?.id === memory.id} /> <div className={`absolute inset-0 blur-md opacity-40 animate-pulse ${memory.emotion === 'anger' ? 'bg-red-500' : memory.emotion === 'sadness' ? 'bg-blue-500' : 'bg-yellow-200'}`} /> </> )}
+                          </div>
+                        </motion.button>
+                      );
+                    })}
+                  </>
+              ) : (
+                  <OrbitLayer memories={memories} onSelect={handleSelectMemoryWrapper} />
+              )}
 
               <AnimatePresence>
                 {selectedMemory && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
                       <div className="absolute inset-0 pointer-events-auto" onClick={() => setSelectedMemory(null)} />
-                      
-                      <motion.div 
-                          key="memory-card" 
-                          layoutId={`memory-container-${selectedMemory.id}`} 
-                          className="relative w-[90%] md:w-[400px] bg-gradient-to-br from-gray-900/90 to-black/90 backdrop-blur-3xl border border-white/10 p-8 rounded-3xl shadow-2xl overflow-hidden cursor-auto pointer-events-auto"
-                          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                      >
+                      <motion.div key="memory-card" layoutId={`memory-container-${selectedMemory.id}`} className="relative w-[90%] md:w-[400px] bg-gradient-to-br from-gray-900/90 to-black/90 backdrop-blur-3xl border border-white/10 p-8 rounded-3xl shadow-2xl overflow-hidden cursor-auto pointer-events-auto" transition={{ type: "spring", stiffness: 300, damping: 30 }}>
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.4 }}>
                             <div className="absolute top-3 left-0 right-0 flex justify-center opacity-30"><div className="w-12 h-1 bg-white rounded-full" /></div>
                             <div className="absolute -top-20 -left-20 w-40 h-40 bg-purple-500/20 blur-[80px] pointer-events-none" />
@@ -7653,16 +7717,21 @@ export default function BambooForest() {
             })}
         </motion.div>
         
-        {/* [Updated] The Living Spirit (Floating & Breathing) */}
+        {/* Spirit Animation */}
         <motion.div 
-            className="absolute inset-0 flex items-center justify-center pointer-events-none" 
+            className={`absolute inset-0 flex items-center justify-center ${!hasWoken ? 'cursor-pointer z-30' : 'pointer-events-none'}`} 
             style={{ x: spiritX, y: spiritY }}
+            onClick={handleSpiritClick}
         >
            <motion.div 
                className="relative z-10 w-[280px] h-[380px] md:w-[400px] md:h-[550px] rounded-[40px] overflow-hidden" 
                style={{ scale: isBreathing ? 1 : spiritScale }} 
                animate={ 
-                   isBreathing 
+                   isSilentMode
+                   ? { scale: 1.15, y: 20, filter: 'brightness(1.1) drop-shadow(0 0 30px rgba(255,255,255,0.4))' }
+                   : !hasWoken 
+                   ? { scale: 0.95, filter: 'brightness(0.4) grayscale(0.8) blur(2px)', y: [0, 5, 0] }
+                   : isBreathing 
                    ? { scale: [1, 1.15, 1.15, 1], filter: ['brightness(1)', 'brightness(1.3) drop-shadow(0 0 30px rgba(255,255,255,0.6))', 'brightness(1.3) drop-shadow(0 0 30px rgba(255,255,255,0.6))', 'brightness(1)'] } 
                    : callStatus === 'idle' 
                    ? { y: [0, -15, 0], filter: ['brightness(0.8) drop-shadow(0 0 10px rgba(255,255,255,0.1))', 'brightness(1) drop-shadow(0 0 25px rgba(255,255,255,0.3))', 'brightness(0.8) drop-shadow(0 0 10px rgba(255,255,255,0.1))'] }
@@ -7670,55 +7739,45 @@ export default function BambooForest() {
                    : { scale: 1.05, y: 0, filter: 'brightness(1.1)' } 
                } 
                transition={ 
-                   isBreathing ? { duration: 19, times: [0, 0.21, 0.58, 1], repeat: Infinity, ease: "easeInOut" } 
+                   !hasWoken 
+                   ? { duration: 8, repeat: Infinity, ease: "easeInOut" } 
+                   : isBreathing ? { duration: 19, times: [0, 0.21, 0.58, 1], repeat: Infinity, ease: "easeInOut" } 
                    : { y: { duration: 6, repeat: Infinity, ease: "easeInOut" }, filter: { duration: 4, repeat: Infinity, ease: "easeInOut", repeatType: "reverse" } } 
                }
            >
-            <motion.div className="absolute inset-0 z-20 pointer-events-none" style={{ backdropFilter: motionValues.blurValue, opacity: motionValues.opacityValue }} />
+            <div className="absolute inset-0 z-20 pointer-events-none" style={{ backdropFilter: motionValues.blurValue as any, opacity: motionValues.opacityValue as any }} />
             <Image src="/images/spirit_final.png" alt="Bamboo Spirit" fill className="object-cover" priority sizes="(max-width: 768px) 100vw, 50vw" />
             <motion.div className="absolute inset-0 bg-white mix-blend-overlay z-30" style={{ opacity: spiritGlowOpacity }} />
             <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-white/5 to-white/10 mix-blend-overlay" />
+            
+            {!hasWoken && hasStarted && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-50">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 3, repeat: Infinity }} className="flex flex-col items-center gap-4">
+                        <MousePointerClick className="text-white/50 w-12 h-12" />
+                        <p className="text-white/60 font-light text-sm tracking-[0.2em] uppercase">Touch to awaken</p>
+                    </motion.div>
+                </div>
+            )}
             {isBreathing && (<div className="absolute inset-0 flex items-center justify-center z-50"><motion.p className="text-white/90 font-light text-xl tracking-[0.4em] uppercase drop-shadow-lg" animate={{ opacity: [0, 1, 1, 0], scale: [0.9, 1.1, 1.1, 0.9] }} transition={{ duration: 19, times: [0, 0.2, 0.8, 1], repeat: Infinity }}>Breathe</motion.p></div>)}
           </motion.div>
         </motion.div>
 
+        {/* Silent Input UI */}
         <AnimatePresence>
-          {callStatus === 'idle' && spiritMessage && !showJournal && !isBreathing && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute w-full z-40 top-1/4 px-8 text-center pointer-events-none">
-              <p className="text-white/80 font-light text-lg leading-relaxed italic drop-shadow-lg">"{spiritMessage}"</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <AnimatePresence>
-            {showSettings && (
-                <motion.div initial={{ opacity: 0, y: 20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.9 }} className="absolute bottom-24 right-8 z-50 w-64 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 shadow-2xl origin-bottom-right">
-                    <div className="flex justify-between items-center mb-6"><span className="text-white/60 text-xs font-mono tracking-widest uppercase">Harmony</span><button onClick={() => setShowSettings(false)} className="text-white/40 hover:text-white"><X size={14}/></button></div>
-                    <div className="mb-6 space-y-3"><div className="flex justify-between text-white/80"><Volume2 size={14} /><span className="text-[10px] font-mono">{Math.round(bgVolume * 100)}%</span></div><input type="range" min="0" max="1" step="0.01" value={bgVolume} onChange={(e) => setBgVolume(parseFloat(e.target.value))} className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full" /></div>
-                    <div className="space-y-3"><div className="flex justify-between text-white/80"><Mic size={14} /><span className="text-[10px] font-mono">{Math.round(voiceVolume * 100)}%</span></div><input type="range" min="0" max="1" step="0.01" value={voiceVolume} onChange={(e) => setVoiceVolume(parseFloat(e.target.value))} className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full" /></div>
+            {isSilentMode && (
+                <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} transition={{ type: "spring", stiffness: 300, damping: 30 }} className="absolute bottom-32 left-0 right-0 z-50 flex justify-center px-4 pointer-events-auto">
+                    <div className="w-full max-w-md relative">
+                        <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-full flex items-center p-2 shadow-2xl">
+                            <input type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={handleKeyDown} placeholder="정령에게 속삭여보세요..." className="flex-1 bg-transparent border-none text-white/90 placeholder-white/30 px-4 py-2 text-sm focus:outline-none focus:ring-0" autoFocus />
+                            <button onClick={handleSendMessage} className="p-3 bg-white/10 rounded-full hover:bg-white/20 text-white transition-colors"><SendHorizontal size={18} /></button>
+                        </div>
+                        <div className="absolute -bottom-10 left-0 right-0 flex justify-center">
+                            <button onClick={toggleSilentMode} className="text-white/30 hover:text-white/50 text-[10px] uppercase tracking-widest flex items-center gap-1"><X size={12} /> Close Whispers</button>
+                        </div>
+                    </div>
                 </motion.div>
             )}
         </AnimatePresence>
-        <div className="absolute bottom-10 left-0 right-0 flex justify-center items-center gap-4 z-50 pointer-events-none">
-            <div className="absolute left-8 flex flex-col gap-1 items-start">
-                <div className="flex items-center gap-2 text-white/40 text-xs font-mono tracking-widest uppercase"><Sparkles size={12} /><span>Phase {soulLevel}: {SOUL_LEVELS[soulLevel].name}</span></div>
-                <div className="w-24 h-0.5 bg-white/10 rounded-full overflow-hidden"><motion.div className="h-full bg-white/40" initial={{ width: 0 }} animate={{ width: `${getProgress()}%` }} transition={{ duration: 1 }} /></div>
-            </div>
-            {callStatus === 'idle' && !showJournal && !isBreathing && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="pointer-events-auto flex items-center gap-2 px-2 py-2 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl">
-                    {AMBIENT_SOUNDS.map((sound) => {
-                        const isLocked = soulLevel < sound.level;
-                        const isSelected = (selectedAmbience || 'clear') === sound.type;
-                        const Icon = sound.icon;
-                        return (
-                            <button key={sound.id} onClick={() => !isLocked && changeAmbience(sound.type)} disabled={isLocked} className={`relative p-3 rounded-full transition-all duration-300 group ${isSelected ? 'bg-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'text-white/40 hover:bg-white/10 hover:text-white/80'}`}>
-                                {isLocked ? (<Lock size={16} className="opacity-50" />) : (<Icon size={18} strokeWidth={isSelected ? 2 : 1.5} />)}
-                                {!isLocked && (<span className="absolute -top-10 left-1/2 -translate-x-1/2 text-[9px] text-white/80 bg-black/60 backdrop-blur-md px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">{sound.name}</span>)}
-                            </button>
-                        );
-                    })}
-                </motion.div>
-            )}
-        </div>
 
         <div className="absolute top-[65%] left-0 right-0 z-40 w-full flex flex-col items-center gap-8 pointer-events-none">
           <AnimatePresence mode="wait">
@@ -7731,39 +7790,37 @@ export default function BambooForest() {
           
           <AnimatePresence mode="wait">
             {callStatus === 'idle' && !showJournal && !isBreathing ? (
+              !hasWoken ? null : 
               !user ? (
-                <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                    className="flex flex-col items-center gap-4 pointer-events-auto"
-                >
-                    <button 
-                        onClick={signInWithGoogle} 
-                        className="group flex items-center gap-3 px-8 py-4 bg-white/90 hover:bg-white text-black font-medium rounded-full shadow-[0_0_40px_rgba(255,255,255,0.1)] transition-all active:scale-95"
-                    >
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="flex flex-col items-center gap-4 pointer-events-auto">
+                    <button onClick={signInWithGoogle} className="group flex items-center gap-3 px-8 py-4 bg-white/90 hover:bg-white text-black font-medium rounded-full shadow-[0_0_40px_rgba(255,255,255,0.1)] transition-all active:scale-95">
                         <svg className="w-5 h-5 opacity-80 group-hover:opacity-100 transition-opacity" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
                         <span className="tracking-widest text-xs uppercase">Begin your journey</span>
                     </button>
                     <span className="text-white/20 text-[9px] uppercase tracking-[0.3em] opacity-0 animate-[fadeIn_2s_ease-in_forwards]">Sanctuary Awaits</span>
                 </motion.div>
               ) : (
-                <motion.div className="flex flex-col items-center gap-4 pointer-events-auto">
-                    <motion.button 
-                        key="start-btn" 
-                        initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.1 }} 
-                        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }} 
-                        onClick={toggleCall} 
-                        className="px-12 py-6 text-sm font-medium text-white bg-white/10 border border-white/20 rounded-full backdrop-blur-xl shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-white/20 transition-all tracking-widest cursor-pointer"
-                    >
+                <motion.div className="flex flex-col items-center gap-4 pointer-events-auto relative">
+                    {showTutorial && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute -top-12 flex flex-col items-center gap-1">
+                            <span className="text-yellow-200/80 text-[10px] font-mono tracking-widest uppercase">Start here</span>
+                            <ArrowUp className="text-yellow-200 w-4 h-4 animate-bounce" />
+                        </motion.div>
+                    )}
+                    <motion.button key="start-btn" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.1 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }} onClick={toggleCall} className="px-12 py-6 text-sm font-medium text-white bg-white/10 border border-white/20 rounded-full backdrop-blur-xl shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-white/20 transition-all tracking-widest cursor-pointer">
                     숲으로 입장하기
                     </motion.button>
                 </motion.div>
               )
             ) : callStatus !== 'idle' ? (
               <motion.div key="active-status" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-6 pointer-events-auto">
-                <button onClick={toggleCall} className="group relative z-50 p-6 rounded-full bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-500/40 transition-all duration-300 cursor-pointer active:scale-90">
-                  <span className="sr-only">End Call</span>
-                  <motion.div animate={{ rotate: callStatus === 'connecting' ? 0 : 90 }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-white/80 group-hover:text-red-200"><path d="M18 6L6 18M6 6l12 12" /></svg></motion.div>
-                </button>
+                <div className="flex items-center gap-6">
+                    <button onClick={toggleSilentMode} className={`p-4 rounded-full border transition-all duration-300 ${isSilentMode ? 'bg-white/20 border-white/40 text-white' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white'}`}><Keyboard size={20} /></button>
+                    <button onClick={toggleCall} className="group relative z-50 p-6 rounded-full bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-500/40 transition-all duration-300 cursor-pointer active:scale-90">
+                        <span className="sr-only">End Call</span>
+                        <motion.div animate={{ rotate: callStatus === 'connecting' ? 0 : 90 }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-white/80 group-hover:text-red-200"><path d="M18 6L6 18M6 6l12 12" /></svg></motion.div>
+                    </button>
+                </div>
                 <div className="flex flex-col items-center gap-2">
                   <motion.span className="text-[10px] font-medium text-green-400/60 tracking-[0.4em] uppercase" animate={callStatus === 'processing' ? { opacity: [1, 0.5, 1] } : { opacity: 1 }} transition={{ duration: 1.5, repeat: Infinity }}>{getStatusText()}</motion.span>
                   <div className="flex gap-1 items-center h-1 w-24 bg-white/5 rounded-full overflow-hidden"><motion.div className="h-full bg-green-400/40" style={{ width: motionValues.barWidth }} /></div>
@@ -7774,19 +7831,37 @@ export default function BambooForest() {
         </div>
 
         <div className="absolute top-8 left-8 z-50 flex flex-col gap-4">
-          {callStatus === 'idle' && (
+          {hasWoken && callStatus === 'idle' && (
             <motion.button onClick={handleToggleJournal} className="p-3 bg-white/10 rounded-full backdrop-blur-md border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
               {showJournal ? <X size={20} /> : <Book size={20} />}
             </motion.button>
           )}
-          {callStatus === 'idle' && !showJournal && (
+          {hasWoken && callStatus === 'idle' && !showJournal && (
              <motion.button onClick={toggleBreathing} className={`p-3 rounded-full backdrop-blur-md border transition-all duration-500 ${isBreathing ? 'bg-blue-500/20 border-blue-400/50 text-blue-200' : 'bg-white/10 border-white/10 text-white/70 hover:bg-white/20 hover:text-white'}`} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                 {isBreathing ? <X size={20} /> : <Wind size={20} />}
              </motion.button>
           )}
         </div>
 
-        {callStatus === 'idle' && !showJournal && !isBreathing && (
+        {/* Bottom Right Buttons (Settings & Altar) */}
+        {hasWoken && callStatus === 'idle' && !showJournal && !isBreathing && (
+            <>
+                {/* [New] Altar Button */}
+                <div className="absolute bottom-8 right-24 z-50">
+                    <motion.button onClick={() => { triggerLight(); setShowAltar(true); }} className="p-3 rounded-full backdrop-blur-md border bg-purple-500/10 border-purple-500/30 text-purple-200 hover:bg-purple-500/20 transition-all shadow-[0_0_15px_rgba(168,85,247,0.3)]" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                        <Palette size={20} />
+                    </motion.button>
+                </div>
+                {/* Settings Button */}
+                <div className="absolute bottom-8 right-8 z-50">
+                    <motion.button onClick={() => { triggerLight(); setShowSettings(!showSettings); }} className={`p-3 rounded-full backdrop-blur-md border transition-all ${showSettings ? 'bg-white/20 border-white/20 text-white' : 'bg-black/20 border-white/10 text-white/60 hover:bg-white/10 hover:text-white'}`} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                        <Settings2 size={20} />
+                    </motion.button>
+                </div>
+            </>
+        )}
+
+        {hasWoken && callStatus === 'idle' && !showJournal && !isBreathing && (
             <div className="absolute bottom-8 right-8 z-50">
                 <motion.button onClick={() => { triggerLight(); setShowSettings(!showSettings); }} className={`p-3 rounded-full backdrop-blur-md border transition-all ${showSettings ? 'bg-white/20 border-white/20 text-white' : 'bg-black/20 border-white/10 text-white/60 hover:bg-white/10 hover:text-white'}`} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
                     <Settings2 size={20} />
@@ -7807,6 +7882,66 @@ export default function BambooForest() {
               <Headphones size={32} className="text-white/50" strokeWidth={1} />
               <div className="text-center space-y-2"><p className="text-white/80 font-light tracking-[0.2em] text-sm uppercase">Immersion Mode</p><p className="text-white/40 font-light text-xs tracking-wider">Use headphones for the best experience</p></div>
               <motion.p className="mt-8 text-white/30 text-[10px] tracking-widest uppercase" animate={{ opacity: [0.3, 0.7, 0.3] }} transition={{ duration: 2, repeat: Infinity }}>Tap anywhere to enter</motion.p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* [New] Altar Modal */}
+      <AnimatePresence>
+        {showAltar && (
+            <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }} className="absolute bottom-0 left-0 right-0 z-[60] bg-gradient-to-t from-black via-zinc-900/95 to-transparent pt-12 pb-8 px-6 rounded-t-3xl backdrop-blur-xl border-t border-white/10 h-[60vh] flex flex-col">
+                <div className="flex justify-between items-end mb-6 border-b border-white/10 pb-4">
+                    <div>
+                        <h2 className="text-white/90 text-xl font-light tracking-widest uppercase">Spirit's Altar</h2>
+                        <p className="text-white/40 text-xs mt-1">Offer resonance to bestow gifts.</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-purple-300 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20"><Gem size={14} /><span className="text-sm font-mono font-bold">{resonance}</span></div>
+                </div>
+                <div className="flex-1 overflow-y-auto grid grid-cols-2 gap-4 pb-20 no-scrollbar">
+                    {ARTIFACTS.map((item) => {
+                        const isOwned = ownedItems.includes(item.id);
+                        const isEquipped = equippedItems[item.type] === item.id;
+                        const canAfford = resonance >= item.cost;
+                        return (
+                            <button key={item.id} onClick={() => isOwned ? equipArtifact(item) : unlockArtifact(item)} disabled={!isOwned && !canAfford} className={`relative p-4 rounded-2xl border flex flex-col items-center gap-3 transition-all ${isEquipped ? 'bg-purple-500/20 border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]' : isOwned ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-black/20 border-white/5 opacity-70'}`}>
+                                <div className="text-3xl filter drop-shadow-md">{item.icon}</div>
+                                <div className="text-center"><div className="text-white/90 text-xs font-medium uppercase tracking-wider">{item.name}</div><div className="text-white/40 text-[10px] mt-1 line-clamp-1">{item.description}</div></div>
+                                <div className="mt-2 w-full">
+                                    {isOwned ? ( <div className={`text-[10px] uppercase tracking-widest py-1 rounded-full text-center border ${isEquipped ? 'bg-purple-500 text-white border-purple-500' : 'bg-white/10 text-white/60 border-transparent'}`}>{isEquipped ? 'Equipped' : 'Select'}</div> ) : ( <div className={`flex items-center justify-center gap-1 text-[10px] font-mono py-1 rounded-full border ${canAfford ? 'text-yellow-200 border-yellow-500/30 bg-yellow-500/10' : 'text-red-300 border-red-500/30 bg-red-500/5'}`}>{canAfford ? <Gem size={10} /> : <Lock size={10} />}<span>{item.cost}</span></div> )}
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+                <button onClick={() => setShowAltar(false)} className="absolute top-4 right-6 text-white/30 hover:text-white"><X size={24} /></button>
+            </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showMemoryRitual && user && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md px-6">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="w-full max-w-sm bg-zinc-900/90 border border-white/10 rounded-3xl p-8 shadow-2xl overflow-hidden relative">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                <h3 className="text-white/80 text-lg font-light text-center mb-6 tracking-widest uppercase">Memory Ritual</h3>
+                <div className="mb-8">
+                    <label className="block text-white/40 text-[10px] uppercase tracking-wider mb-2 text-center">Summary of the Soul</label>
+                    <textarea value={pendingSummary} onChange={(e) => setPendingSummary(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white/90 text-sm font-light focus:outline-none focus:border-white/30 transition-colors resize-none text-center italic" rows={3} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <button onClick={() => finalizeMemory('standard', pendingSummary, user.id)} className="group flex flex-col items-center gap-3 p-4 rounded-2xl bg-white/5 hover:bg-blue-500/10 border border-white/10 hover:border-blue-500/30 transition-all">
+                        <div className="p-3 bg-blue-500/20 rounded-full text-blue-200 group-hover:scale-110 transition-transform"><Send size={20} /></div>
+                        <span className="text-white/60 text-[10px] uppercase tracking-wider group-hover:text-white">Release</span>
+                    </button>
+                    <button onClick={() => { if (isPremium) { finalizeMemory('capsule', pendingSummary, user.id); } else { alert("성소 멤버십이 필요한 기능입니다."); } }} className={`group flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all ${isPremium ? 'bg-white/5 hover:bg-yellow-500/10 border-white/10 hover:border-yellow-500/30' : 'bg-black/40 border-white/5 opacity-50 cursor-not-allowed'}`}>
+                        <div className={`p-3 rounded-full transition-transform group-hover:scale-110 ${isPremium ? 'bg-yellow-500/20 text-yellow-200' : 'bg-white/5 text-white/20'}`}>{isPremium ? <Clock size={20} /> : <Lock size={20} />}</div>
+                        <span className={`text-[10px] uppercase tracking-wider ${isPremium ? 'text-white/60 group-hover:text-white' : 'text-white/20'}`}>Time Capsule</span>
+                    </button>
+                </div>
+                <div className="mt-6 text-center">
+                    <button onClick={() => setShowMemoryRitual(false)} className="text-white/20 text-[10px] hover:text-white/50 transition-colors uppercase tracking-widest">Discard Memory</button>
+                </div>
             </motion.div>
           </motion.div>
         )}
@@ -7898,6 +8033,72 @@ export const getMoonPhase = (date: Date) => {
           default: return "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8 8z";
       }
   };
+```
+
+--- FILE: ./app/hooks/useParallax.ts ---
+```ts
+// app/hooks/useParallax.ts
+import { useEffect, useCallback } from 'react';
+import { useMotionValue } from 'framer-motion';
+
+export function useParallax() {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  // 1. Desktop Mouse Logic
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const { innerWidth, innerHeight } = window;
+      // 화면 중앙을 0,0으로 하고 -1 ~ 1 범위로 정규화
+      const nx = (e.clientX / innerWidth) * 2 - 1;
+      const ny = (e.clientY / innerHeight) * 2 - 1;
+      x.set(nx);
+      y.set(ny);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [x, y]);
+
+  // 2. Mobile Gyroscope Logic
+  const handleOrientation = useCallback((e: DeviceOrientationEvent) => {
+    // gamma: 좌우 기울기 (-90 ~ 90)
+    // beta: 앞뒤 기울기 (-180 ~ 180)
+    const gamma = e.gamma || 0;
+    const beta = e.beta || 0;
+
+    // 모바일은 기울임 각도를 -1 ~ 1 범위로 매핑 (감도 조절: 45도로 제한)
+    const nx = Math.max(-1, Math.min(1, gamma / 45));
+    const ny = Math.max(-1, Math.min(1, (beta - 45) / 45)); // 45도 들고 있는 상태를 기준으로
+
+    x.set(nx);
+    y.set(ny);
+  }, [x, y]);
+
+  // 3. Permission Request (iOS 13+ 필수)
+  const requestAccess = useCallback(async () => {
+    if (typeof DeviceOrientationEvent !== 'undefined' && (DeviceOrientationEvent as any).requestPermission) {
+      try {
+        const response = await (DeviceOrientationEvent as any).requestPermission();
+        if (response === 'granted') {
+          window.addEventListener('deviceorientation', handleOrientation);
+        }
+      } catch (e) {
+        console.error('Gyro permission denied:', e);
+      }
+    } else {
+      // 안드로이드나 구형 iOS는 권한 없이 바로 붙음
+      window.addEventListener('deviceorientation', handleOrientation);
+    }
+  }, [handleOrientation]);
+
+  // Cleanup
+  useEffect(() => {
+    return () => window.removeEventListener('deviceorientation', handleOrientation);
+  }, [handleOrientation]);
+
+  return { x, y, requestAccess };
+}
 ```
 
 --- FILE: ./app/hooks/useHaptic.ts ---
@@ -8209,6 +8410,7 @@ import { WeatherType, CallStatus, TIME_THEMES, EMOTION_COLORS, Memory } from '..
 import { useSoundEngine } from './useSoundEngine'; 
 import { useHaptic } from './useHaptic';
 import { useAuth } from './useAuth';
+import { useParallax } from './useParallax'; 
 
 const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || '';
 const ASSISTANT_ID = process.env.NEXT_PUBLIC_ASSISTANT_ID || '';
@@ -8217,6 +8419,10 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// [New] 침묵의 수호자 (무음 오디오 데이터)
+// 화면이 꺼져도 오디오 세션을 유지하기 위한 0.1초짜리 무음 WAV 파일
+const SILENT_AUDIO_URI = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
 const DAILY_QUOTES = [
   "천천히 가도 괜찮아, 방향만 맞다면.", "비바람이 불어야 뿌리가 단단해지는 법이야.",
   "너는 존재만으로도 충분히 아름다워.", "잠시 멈춰서 숨을 고르는 것도 용기야.",
@@ -8224,8 +8430,25 @@ const DAILY_QUOTES = [
   "가장 깊은 밤이 지나야 새벽이 온다.", "너의 속도로 걸어가도 돼."
 ];
 
+export type ArtifactType = 'aura' | 'head';
+export interface Artifact {
+    id: string;
+    type: ArtifactType;
+    name: string;
+    description: string;
+    cost: number;
+    icon: string;
+}
+
+export const ARTIFACTS: Artifact[] = [
+    { id: 'aura_firefly', type: 'aura', name: "Forest Whispers", description: "작은 숲의 정령들이 주위를 맴돕니다.", cost: 0, icon: "✨" }, 
+    { id: 'aura_moonlight', type: 'aura', name: "Lunar Veil", description: "달빛의 가호가 깃듭니다.", cost: 150, icon: "🌙" },
+    { id: 'aura_ember', type: 'aura', name: "Warmth of Hearth", description: "따뜻한 온기가 감돕니다.", cost: 300, icon: "🔥" },
+    { id: 'head_flower', type: 'head', name: "Bloom Crown", description: "봄에 핀 첫 꽃으로 만든 화관.", cost: 100, icon: "🌸" },
+    { id: 'head_fox', type: 'head', name: "Mystic Mask", description: "오래된 여우 가면.", cost: 500, icon: "🦊" },
+];
+
 export function useBambooEngine() {
-  // --- State ---
   const [hasStarted, setHasStarted] = useState(false);
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [backgroundGradient, setBackgroundGradient] = useState<string[]>(TIME_THEMES.night);
@@ -8237,70 +8460,115 @@ export function useBambooEngine() {
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [isDaytime, setIsDaytime] = useState(false);
+  
+  const [showMemoryRitual, setShowMemoryRitual] = useState(false); 
+  const [pendingSummary, setPendingSummary] = useState("");        
 
-  // Auth & Identity
+  const [hasWoken, setHasWoken] = useState(false); 
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [isSilentMode, setIsSilentMode] = useState(false);
+
+  const [ownedItems, setOwnedItems] = useState<string[]>(['aura_firefly']); 
+  const [equippedItems, setEquippedItems] = useState<{ aura: string | null, head: string | null }>({
+      aura: 'aura_firefly',
+      head: null
+  });
+  const [showAltar, setShowAltar] = useState(false); 
+
   const { user, isPremium, signInWithGoogle, signOut } = useAuth();
-  // const [anonId, setAnonId] = useState<string>(''); // [Removed] 익명 ID 제거
-
-  // Volume States
   const [bgVolume, setBgVolume] = useState(0.5);
   const [voiceVolume, setVoiceVolume] = useState(1.0);
 
-  // Gamification
   const [resonance, setResonance] = useState(0); 
   const [soulLevel, setSoulLevel] = useState(1);
   const [hasCollectedDew, setHasCollectedDew] = useState(true);
   const [dailyQuote, setDailyQuote] = useState<string | null>(null);
 
-  // Breathing & Ambience
   const [isBreathing, setIsBreathing] = useState(false);
   const [selectedAmbience, setSelectedAmbience] = useState<WeatherType | null>(null);
 
-  // Engines
   const { initAudio, playWaterDrop, playWindChime, playPaperRustle, playMagicDust } = useSoundEngine();
-  const { triggerLight, triggerMedium, triggerBreathing } = useHaptic();
+  const { triggerLight, triggerMedium, triggerBreathing, triggerSuccess } = useHaptic();
 
-  // --- Animation Values ---
+  const { x: rawX, y: rawY, requestAccess: requestGyro } = useParallax();
+  const smoothOptions = { stiffness: 100, damping: 20 };
+  const mouseX = useSpring(rawX, smoothOptions);
+  const mouseY = useSpring(rawY, smoothOptions);
+
   const volumeMotion = useMotionValue(0);
   const springVolume = useSpring(volumeMotion, { stiffness: 300, damping: 30 });
   const blurValue = useTransform(springVolume, (v) => `blur(${(1 - v) * 10}px)`);
   const opacityValue = useTransform(springVolume, (v) => 1 - v);
   const barWidth = useTransform(springVolume, (v) => `${v * 100}%`);
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
-    const { innerWidth, innerHeight } = window;
-    const x = (e.clientX / innerWidth) * 2 - 1;
-    const y = (e.clientY / innerHeight) * 2 - 1;
-    mouseX.set(x);
-    mouseY.set(y);
-  }, [mouseX, mouseY]);
 
   const motionValues = { blurValue, opacityValue, barWidth, springVolume, mouseX, mouseY };
   
   const vapiRef = useRef<any>(null);
+  // [New] Silent Audio & WakeLock Refs
+  const silentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const wakeLockRef = useRef<any>(null);
+
   const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({ clear: null, rain: null, snow: null, ember: null });
   const fadeIntervals = useRef<{ [key in WeatherType]: NodeJS.Timeout | null }>({ clear: null, rain: null, snow: null, ember: null });
 
-  // --- Helpers: Audio Fader ---
+  // [New] Wake Lock Implementation
+  const requestWakeLock = async () => {
+    if ('wakeLock' in navigator) {
+      try {
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+      } catch (err) {
+        console.error('Wake Lock failed:', err);
+      }
+    }
+  };
+
+  const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      } catch (err) {
+        console.error('Wake Lock release failed:', err);
+      }
+    }
+  };
+
+  // [New] Call State Effect: Handle Silent Audio & Wake Lock
+  useEffect(() => {
+    // Init Silent Audio
+    if (!silentAudioRef.current && typeof window !== 'undefined') {
+        const audio = new Audio(SILENT_AUDIO_URI);
+        audio.loop = true;
+        audio.volume = 0.01; // 거의 안 들리게
+        silentAudioRef.current = audio;
+    }
+
+    if (callStatus === 'active' || callStatus === 'speaking' || callStatus === 'listening') {
+        // 통화 중: 무음 오디오 재생 + 화면 꺼짐 방지
+        silentAudioRef.current?.play().catch(() => {}); // 자동 재생 정책 등으로 실패해도 무시
+        requestWakeLock();
+    } else {
+        // 대기 중: 정지 및 해제
+        silentAudioRef.current?.pause();
+        releaseWakeLock();
+    }
+
+    return () => {
+        silentAudioRef.current?.pause();
+        releaseWakeLock();
+    };
+  }, [callStatus]);
+
+
   const fadeToVolume = useCallback((type: WeatherType, targetVol: number, duration: number = 1000) => {
     const audio = audioRefs.current[type];
     if (!audio) return;
-
-    if (fadeIntervals.current[type]) {
-      clearInterval(fadeIntervals.current[type]!);
-    }
-
+    if (fadeIntervals.current[type]) clearInterval(fadeIntervals.current[type]!);
     const stepTime = 50; 
     const steps = duration / stepTime;
     const volDiff = targetVol - audio.volume;
     const stepVol = volDiff / steps;
-
-    if (targetVol > 0 && audio.paused) {
-        audio.play().catch(e => console.error("Audio play failed:", e));
-    }
-
+    if (targetVol > 0 && audio.paused) audio.play().catch(e => console.error("Audio play failed:", e));
     fadeIntervals.current[type] = setInterval(() => {
         let newVol = audio.volume + stepVol;
         if ((stepVol > 0 && newVol >= targetVol) || (stepVol < 0 && newVol <= targetVol)) {
@@ -8317,7 +8585,6 @@ export function useBambooEngine() {
   const checkTimeOfDay = useCallback(() => {
     const hour = new Date().getHours();
     let theme = TIME_THEMES.night;
-    
     if (hour >= 6 && hour < 18) {
         setIsDaytime(true);
         if (hour < 7) theme = TIME_THEMES.dawn;      
@@ -8328,13 +8595,11 @@ export function useBambooEngine() {
         if (hour >= 18 && hour < 20) theme = TIME_THEMES.sunset; 
         else theme = TIME_THEMES.night;
     }
-
     setBackgroundGradient(theme);
     if (!selectedAmbience) setWeather('clear');
     setShowEasterEgg(hour === 3); 
   }, [selectedAmbience]);
 
-  // --- Main Audio Logic ---
   useEffect(() => {
     if (!isMounted || !hasStarted) return;
     const targetKey = selectedAmbience || weather;
@@ -8342,33 +8607,22 @@ export function useBambooEngine() {
       const type = key as WeatherType;
       const audio = audioRefs.current[type];
       if (type === targetKey) {
-        if (audio && (audio.paused || Math.abs(audio.volume - bgVolume) > 0.05)) {
-             fadeToVolume(type, bgVolume, 1000); 
-        }
+        if (audio && (audio.paused || Math.abs(audio.volume - bgVolume) > 0.05)) fadeToVolume(type, bgVolume, 1000); 
       } else {
-        if (audio && !audio.paused && audio.volume > 0) {
-            fadeToVolume(type, 0, 1000);
-        }
+        if (audio && !audio.paused && audio.volume > 0) fadeToVolume(type, 0, 1000);
       }
     });
   }, [weather, selectedAmbience, callStatus, isMounted, hasStarted, bgVolume, fadeToVolume]);
 
-  // --- Identity Logic ---
-  // [Correct] user가 있으면 user.id, 없으면 null
   const currentUserId = user ? user.id : null;
 
-  // --- Continuity ---
   useEffect(() => {
     const savedBgVol = localStorage.getItem('bamboo_bg_volume');
     const savedVoiceVol = localStorage.getItem('bamboo_voice_volume');
     const savedAmbience = localStorage.getItem('bamboo_ambience') as WeatherType | null;
-
     if (savedBgVol) setBgVolume(parseFloat(savedBgVol));
     if (savedVoiceVol) setVoiceVolume(parseFloat(savedVoiceVol));
-    if (savedAmbience) {
-        setSelectedAmbience(savedAmbience);
-        setWeather(savedAmbience); 
-    }
+    if (savedAmbience) { setSelectedAmbience(savedAmbience); setWeather(savedAmbience); }
   }, []);
 
   useEffect(() => { localStorage.setItem('bamboo_bg_volume', bgVolume.toString()); }, [bgVolume]);
@@ -8386,6 +8640,7 @@ export function useBambooEngine() {
     if (!uid) return;
     const { data } = await supabase.from('memories').select('*').eq('user_id', uid).order('created_at', { ascending: false });
     if (data) {
+      if (data.length > 0) setHasWoken(true); else setHasWoken(false);
       setMemories(data.map((m: any) => {
         let detectedEmotion: any = 'neutral';
         const text = m.summary.toLowerCase();
@@ -8396,46 +8651,54 @@ export function useBambooEngine() {
            const randomEmotions = ['sadness', 'anger', 'loneliness', 'neutral'];
            detectedEmotion = randomEmotions[m.id % randomEmotions.length];
         }
-        // DB에서 가져온 기억은 랜덤 위치에 뿌리되, 매번 바뀌지 않게 하려면 DB에 x,y도 저장해야 함.
-        // 현재는 임시로 랜덤 위치 생성
         return { ...m, emotion: m.emotion || detectedEmotion, x: 10 + Math.random() * 80, y: 15 + Math.random() * 60 };
       }));
     }
   }, []);
 
-  const saveFallbackMemory = async (uid: string) => {
-    const isTimeCapsule = Math.random() > 0.7; 
-    let unlockDate = null;
-    const hour = new Date().getHours();
-    const emotions = ['neutral', 'happy', 'sadness', 'loneliness'];
-    const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
-    let title = "밤하늘에 남긴 이야기";
-    if (hour >= 5 && hour < 11) title = "새벽의 속삭임";
-    else if (hour >= 11 && hour < 17) title = "오후의 대화";
-    else if (hour >= 17 && hour < 20) title = "노을 진 숲에서의 기억";
-        if (isTimeCapsule) {
-        // 1분 뒤에 열리는 타임캡슐 (테스트를 위해 짧게 설정)
-        const date = new Date();
-        date.setMinutes(date.getMinutes() + 1); 
-        unlockDate = date.toISOString();
-    }
-    await supabase.from('memories').insert({ 
-        user_id: uid, 
-        summary: title, 
-        emotion: randomEmotion,
-        unlock_date: unlockDate // [New]
-    });
-    fetchMemories(uid);
+  const wakeSpirit = () => {
+      if (triggerSuccess) triggerSuccess(); 
+      playMagicDust();
+      playWindChime();
+      requestGyro();
+      setHasWoken(true);
+      setShowTutorial(true);
+      setSpiritMessage("...오랫동안 너를 기다렸어."); 
+      setTimeout(() => setShowTutorial(false), 8000); 
   };
 
-  // [Fix] 로그인 체크 제거 (누구나 숲에 들어올 수 있음)
+  const generateDefaultTitle = () => {
+      const hour = new Date().getHours();
+      if (hour >= 5 && hour < 11) return "새벽의 속삭임";
+      else if (hour >= 11 && hour < 17) return "오후의 대화";
+      else if (hour >= 17 && hour < 20) return "노을 진 숲에서의 기억";
+      return "밤하늘에 남긴 이야기";
+  };
+
+  const finalizeMemory = async (type: 'standard' | 'capsule', summary: string, uid: string) => {
+      const emotions = ['neutral', 'happy', 'sadness', 'loneliness'];
+      const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
+      let unlockDate = null;
+      if (type === 'capsule') {
+          const date = new Date();
+          date.setMinutes(date.getMinutes() + 1);      
+          unlockDate = date.toISOString();
+      }
+      const { error } = await supabase.from('memories').insert({ 
+          user_id: uid, summary: summary || generateDefaultTitle(), emotion: randomEmotion, unlock_date: unlockDate
+      });
+      if (!error) {
+          await fetchMemories(uid);
+          if (triggerSuccess) triggerSuccess(); 
+      }
+      setShowMemoryRitual(false); 
+  };
+
   const startExperience = () => {
     setHasStarted(true);
     triggerLight();
     initAudio(); 
     playMagicDust();
-    
-    // 오디오 재생
     const currentAudioKey = selectedAmbience || 'clear';
     fadeToVolume(currentAudioKey, bgVolume, 2000); 
   };
@@ -8467,14 +8730,27 @@ export function useBambooEngine() {
   }, [triggerMedium]);
 
   const toggleBreathing = () => {
-    triggerLight(); 
-    playWindChime();
-    setIsBreathing(prev => !prev);
+    triggerLight(); playWindChime(); setIsBreathing(prev => !prev);
+  };
+
+  const toggleSilentMode = () => {
+      triggerMedium(); setIsSilentMode(prev => !prev);
+      if (showTutorial) setShowTutorial(false);
+  };
+
+  const sendTextMessage = (text: string) => {
+      if (!vapiRef.current || !text.trim()) return;
+      try {
+          vapiRef.current.send({
+              type: "add-message",
+              message: { role: "user", content: text }
+          });
+          playPaperRustle(); 
+      } catch (e) { console.error("Failed to send text message:", e); }
   };
 
   const collectDew = useCallback(() => {
-    triggerMedium(); 
-    playWaterDrop();
+    triggerMedium(); playWaterDrop();
     setResonance(prev => {
         const next = prev + 50;
         localStorage.setItem('spirit_resonance', next.toString());
@@ -8488,12 +8764,31 @@ export function useBambooEngine() {
     setTimeout(() => setDailyQuote(null), 5000);
   }, [playWaterDrop, triggerMedium]);
 
-  // Effects
+  const unlockArtifact = (item: Artifact) => {
+      if (ownedItems.includes(item.id)) return;
+      if (resonance < item.cost) { alert("공명도(Resonance)가 부족합니다."); return; }
+      setResonance(prev => {
+          const next = prev - item.cost;
+          localStorage.setItem('spirit_resonance', next.toString());
+          return next;
+      });
+      setOwnedItems(prev => [...prev, item.id]);
+      triggerSuccess(); 
+  };
+
+  const equipArtifact = (item: Artifact) => {
+      if (!ownedItems.includes(item.id)) return;
+      setEquippedItems(prev => {
+          if (prev[item.type] === item.id) return { ...prev, [item.type]: null };
+          return { ...prev, [item.type]: item.id };
+      });
+      playMagicDust(); 
+  };
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isBreathing) {
-      triggerBreathing(); 
-      interval = setInterval(() => { triggerBreathing(); }, 9500); 
+      triggerBreathing(); interval = setInterval(() => { triggerBreathing(); }, 9500); 
     }
     return () => clearInterval(interval);
   }, [isBreathing, triggerBreathing]);
@@ -8527,31 +8822,21 @@ export function useBambooEngine() {
     else setSoulLevel(4);
   }, [resonance]);
 
-  // Init & ID Change Effect
   useEffect(() => {
     setIsMounted(true);
     checkTimeOfDay();
     const interval = setInterval(checkTimeOfDay, 60000);
-
-    // 로그인 상태가 바뀌면(currentUserId 변경 시) 기억을 다시 불러옴
-    if (currentUserId) {
-        fetchMemories(currentUserId);
-    } else {
-        setMemories([]); // 로그아웃 시 기억 비우기
-    }
-
+    if (currentUserId) fetchMemories(currentUserId); else setMemories([]); 
     if (!VAPI_PUBLIC_KEY) return;
     const vapi = new Vapi(VAPI_PUBLIC_KEY);
     vapiRef.current = vapi;
-
     vapi.on('call-start', () => { triggerMedium(); setCallStatus('active'); setSpiritMessage(null); setIsBreathing(false); });
     vapi.on('call-end', () => {
-      triggerLight(); setCallStatus('idle'); volumeMotion.set(0);
+      triggerLight(); setCallStatus('idle'); volumeMotion.set(0); setIsSilentMode(false);
       const messages = [ "비가 그치면 땅이 더 단단해질 거야.", "언제든 여기서 기다릴게.", "오늘 밤은 푹 잘 수 있을 거야.", "바람이 네 걱정을 가져갔어." ];
       setSpiritMessage(messages[Math.floor(Math.random() * messages.length)]);
       checkTimeOfDay(); 
-      // 통화 종료 시 기억 저장 (로그인 유저만)
-      if (currentUserId) saveFallbackMemory(currentUserId); 
+      if (currentUserId) { setPendingSummary(generateDefaultTitle()); setShowMemoryRitual(true); }
     });
     vapi.on('error', (e: any) => {
         console.log("Vapi Connection Closed (Silence/Error):", e);
@@ -8569,31 +8854,20 @@ export function useBambooEngine() {
           if (!selectedAmbience) {
               const category = (output.value as string).toLowerCase();
               if (Object.keys(EMOTION_COLORS).includes(category)) setBackgroundGradient(EMOTION_COLORS[category as keyof typeof EMOTION_COLORS]);
-              if (category === 'sadness') setWeather('rain');
-              else if (category === 'loneliness') setWeather('snow');
-              else if (category === 'anger') setWeather('ember');
-              else setWeather('clear');
+              if (category === 'sadness') setWeather('rain'); else if (category === 'loneliness') setWeather('snow'); else if (category === 'anger') setWeather('ember'); else setWeather('clear');
           }
         }
       });
-
     return () => { clearInterval(interval); try { vapi.stop(); vapi.removeAllListeners(); } catch (e) {} };
   }, [volumeMotion, weather, currentUserId, fetchMemories, checkTimeOfDay, triggerLight, triggerMedium, selectedAmbience]);
 
   const toggleCall = () => {
-    // [Security] 대화 시작은 로그인 필수
-    if (!currentUserId) {
-        // UI가 이미 버튼을 숨기고 있지만, 안전장치로 추가
-        alert("로그인이 필요합니다."); 
-        return;
-    }
-
+    if (showTutorial) setShowTutorial(false);
+    if (!currentUserId) { alert("로그인이 필요합니다."); return; }
     if (callStatus === 'idle') {
       triggerMedium(); setCallStatus('connecting'); 
       vapiRef.current?.start(ASSISTANT_ID, { metadata: { userId: currentUserId } }); 
-    } else {
-      triggerLight(); vapiRef.current?.stop(); setTimeout(() => setCallStatus('idle'), 500);
-    }
+    } else { triggerLight(); vapiRef.current?.stop(); setTimeout(() => setCallStatus('idle'), 500); }
   };
 
   const getStatusText = useCallback(() => {
@@ -8613,14 +8887,18 @@ export function useBambooEngine() {
     callStatus, backgroundGradient, weather, spiritMessage, memories,
     toggleCall, getStatusText, audioRefs, motionValues,
     capturingId, shareMemory, deleteMemory, isDeleting,
-    showEasterEgg, handleMouseMove,
+    showEasterEgg,
     resonance, soulLevel,
     hasCollectedDew, collectDew, dailyQuote,
     isBreathing, toggleBreathing,
     playPaperRustle, playMagicDust,
     triggerLight, selectedAmbience, changeAmbience, initAudio,
     isDaytime, bgVolume, setBgVolume, voiceVolume, setVoiceVolume,
-    user, isPremium, signInWithGoogle, signOut
+    user, isPremium, signInWithGoogle, signOut,
+    showMemoryRitual, setShowMemoryRitual, pendingSummary, setPendingSummary, finalizeMemory,
+    hasWoken, wakeSpirit, showTutorial,
+    isSilentMode, toggleSilentMode, sendTextMessage,
+    ownedItems, equippedItems, showAltar, setShowAltar, unlockArtifact, equipArtifact, ARTIFACTS
   };
 }
 ```
