@@ -20,16 +20,35 @@ const DAILY_QUOTES = [
 export function useBambooEngine() {
   const { user, isPremium, signInWithGoogle, signOut } = useAuth();
   const { triggerSuccess, triggerMedium, triggerLight, triggerBreathing } = useHaptic();
-  const { playPaperRustle, playMagicDust, playWindChime, playWaterDrop, initAudio } = useSoundEngine();
+  const { playPaperRustle, playMagicDust, playWindChime, playWaterDrop, initAudio, playIntroBoom } = useSoundEngine();
   
   const soul = useSoulData(user, triggerSuccess);
   
+  // State definitions (Moved up for closure access)
+  const [weather, setWeather] = useState<WeatherType>('clear');
+  const [selectedAmbience, setSelectedAmbience] = useState<WeatherType | null>(null);
+
+  // [New] 감정 감지 핸들러
+  // Vapi가 감정을 감지하면 이 함수가 호출되어 날씨를 자동으로 바꿉니다.
+  const handleEmotionDetected = useCallback((detectedWeather: WeatherType) => {
+      // 현재 날씨와 다를 때만 변경 (불필요한 리렌더링 방지)
+      setWeather((prev) => {
+          if (prev !== detectedWeather) {
+              triggerMedium(); // 햅틱 피드백으로 "숲이 반응했음"을 알림
+              setSelectedAmbience(detectedWeather); // UI 버튼 상태도 동기화
+              return detectedWeather;
+          }
+          return prev;
+      });
+  }, [triggerMedium]);
+
   const handleCallEnd = useCallback(() => {
       triggerLight();
       soul.fetchMemories();
   }, [triggerLight, soul]);
 
-  const voice = useSpiritVapi(user?.id ?? null, handleCallEnd);
+  // [Check] handleEmotionDetected를 useSpiritVapi에 전달
+  const voice = useSpiritVapi(user?.id ?? null, handleCallEnd, handleEmotionDetected);
 
   const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({ clear: null, rain: null, snow: null, ember: null });
   const fadeIntervals = useRef<{ [key in WeatherType]: NodeJS.Timeout | null }>({ clear: null, rain: null, snow: null, ember: null });
@@ -54,7 +73,7 @@ export function useBambooEngine() {
   const barWidth = useTransform(springVolume, (v) => `${v * 100}%`);
   const motionValues = { blurValue, opacityValue, barWidth, springVolume, mouseX, mouseY };
 
-  // State
+  // Other States
   const [showJournal, setShowJournal] = useState(false);
   const [showAltar, setShowAltar] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -68,11 +87,12 @@ export function useBambooEngine() {
   const [isBreathing, setIsBreathing] = useState(false);
   const [isHolding, setIsHolding] = useState(false); 
   
+  const [sleepTimer, setSleepTimer] = useState<number | null>(null);
+  const [initialSleepTime, setInitialSleepTime] = useState<number | null>(null);
+
   const [isDaytime, setIsDaytime] = useState(false);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
-  const [weather, setWeather] = useState<WeatherType>('clear');
   const [backgroundGradient, setBackgroundGradient] = useState<string[]>(TIME_THEMES.night);
-  const [selectedAmbience, setSelectedAmbience] = useState<WeatherType | null>(null);
   const [season, setSeason] = useState<SeasonType>('spring');
   
   const [bgVolume, setBgVolume] = useState(0.5);
@@ -88,6 +108,12 @@ export function useBambooEngine() {
       setHasCollectedDew(true);
       setTimeout(() => setDailyQuote(null), 5000);
   }, [playWaterDrop, triggerMedium, soul]);
+
+  const [hasStarted, setHasStarted] = useState(false);
+  const startExperience = useCallback(() => {
+      setHasStarted(true);
+      initAudio(); 
+  }, [initAudio]);
 
   const wakeSpirit = () => {
       triggerSuccess();
@@ -113,13 +139,13 @@ export function useBambooEngine() {
       if (showTutorial) setShowTutorial(false);
   };
 
+  // [Manual Override] 사용자가 버튼을 누르면 강제로 날씨 변경
   const changeAmbience = (type: WeatherType) => {
       triggerLight();
       setSelectedAmbience(type);
       setWeather(type);
   };
 
-  // [New] Tactile Handler
   const handlePet = useCallback(() => {
       if (!isHolding && Math.random() > 0.7) { 
           triggerLight();
@@ -127,14 +153,37 @@ export function useBambooEngine() {
       }
   }, [isHolding, triggerLight, playMagicDust]);
 
-  // Audio Logic (Improved Fading)
+  // Sleep Timer Logic
+  const startSleepTimer = useCallback((minutes: number) => {
+      triggerSuccess();
+      const seconds = minutes * 60;
+      setSleepTimer(seconds);
+      setInitialSleepTime(seconds);
+      setIsBreathing(true);
+  }, [triggerSuccess]);
+
+  const stopSleepTimer = useCallback(() => {
+      setSleepTimer(null);
+      setInitialSleepTime(null);
+  }, []);
+
+  useEffect(() => {
+      if (sleepTimer === null) return;
+      if (sleepTimer <= 0) {
+          stopSleepTimer();
+          return;
+      }
+      const interval = setInterval(() => {
+          setSleepTimer(prev => (prev !== null ? prev - 1 : null));
+      }, 1000);
+      return () => clearInterval(interval);
+  }, [sleepTimer, stopSleepTimer]);
+
+  // Audio Fading Logic
   const fadeToVolume = useCallback((type: WeatherType, targetVol: number, duration: number = 1000) => {
     const audio = audioRefs.current[type];
     if (!audio) return;
-    
-    // [Fix] Stutter Prevention: 이미 목표 볼륨 근처라면 스킵
     if (Math.abs(audio.volume - targetVol) < 0.01 && (targetVol === 0 ? audio.paused : !audio.paused)) return;
-
     if (fadeIntervals.current[type]) clearInterval(fadeIntervals.current[type]!);
     
     const stepTime = 50; 
@@ -160,32 +209,36 @@ export function useBambooEngine() {
   }, []);
 
   useEffect(() => {
+    let sleepMultiplier = 1;
+    if (sleepTimer !== null && initialSleepTime !== null) {
+        sleepMultiplier = Math.max(0, sleepTimer / initialSleepTime);
+    }
+    const effectiveBgVolume = bgVolume * sleepMultiplier;
+
+    // selectedAmbience가 있으면 그것을, 없으면 자동 감지된 weather를 사용
     const targetKey = selectedAmbience || weather;
+    
     Object.keys(audioRefs.current).forEach((key) => {
       const type = key as WeatherType;
       const audio = audioRefs.current[type];
       if (type === targetKey) {
-        // [Fix] Conditional Fade
-        if (audio && (audio.paused || Math.abs(audio.volume - bgVolume) > 0.05)) fadeToVolume(type, bgVolume, 1000); 
+        if (audio && (audio.paused || Math.abs(audio.volume - effectiveBgVolume) > 0.01)) fadeToVolume(type, effectiveBgVolume, 1000); 
       } else {
         if (audio && !audio.paused && audio.volume > 0) fadeToVolume(type, 0, 1000);
       }
     });
-  }, [weather, selectedAmbience, bgVolume, fadeToVolume]);
+  }, [weather, selectedAmbience, bgVolume, fadeToVolume, sleepTimer, initialSleepTime]);
 
   const checkTimeAndSeason = useCallback(() => {
     const now = new Date();
     const hour = now.getHours();
     const month = now.getMonth();
-
     if (month >= 2 && month <= 4) setSeason('spring');
     else if (month >= 5 && month <= 7) setSeason('summer');
     else if (month >= 8 && month <= 10) setSeason('autumn');
     else setSeason('winter');
-
     const isDay = hour >= 6 && hour < 18;
     setIsDaytime(isDay);
-
     if (!selectedAmbience) {
         let theme = TIME_THEMES.night;
         if (isDay) {
@@ -197,14 +250,12 @@ export function useBambooEngine() {
             else theme = TIME_THEMES.night;
         }
         setBackgroundGradient(theme);
-        setWeather('clear');
     }
     setShowEasterEgg(hour === 3); 
   }, [selectedAmbience]);
 
   useEffect(() => { checkTimeAndSeason(); const interval = setInterval(checkTimeAndSeason, 60000); return () => clearInterval(interval); }, [checkTimeAndSeason]);
   useEffect(() => { const last = localStorage.getItem('last_dew_date'); setHasCollectedDew(last === new Date().toDateString()); }, []);
-  
   useEffect(() => {
       let interval: NodeJS.Timeout;
       if (isBreathing || isHolding) {
@@ -213,7 +264,6 @@ export function useBambooEngine() {
       }
       return () => clearInterval(interval);
   }, [isBreathing, isHolding, triggerBreathing]);
-
   useEffect(() => {
       let interval: NodeJS.Timeout;
       if (voice.callStatus === 'active' || voice.callStatus === 'speaking' || voice.callStatus === 'listening') {
@@ -221,7 +271,6 @@ export function useBambooEngine() {
       }
       return () => clearInterval(interval);
   }, [voice.callStatus, soul]);
-
   useEffect(() => {
       const savedBg = localStorage.getItem('bamboo_bg_volume');
       const savedVoice = localStorage.getItem('bamboo_voice_volume');
@@ -251,7 +300,8 @@ export function useBambooEngine() {
   }, [voice.callStatus]);
 
   return {
-      user, isPremium, signInWithGoogle, signOut, isMounted: true, hasStarted: true,
+      user, isPremium, signInWithGoogle, signOut, isMounted: true, 
+      hasStarted, startExperience,
       callStatus: voice.callStatus, toggleCall: voice.toggleCall, spiritMessage: voice.spiritMessage,
       isSilentMode: voice.isSilentMode, toggleSilentMode, sendTextMessage: voice.sendTextMessage, getStatusText,
       resonance: soul.resonance, soulLevel: soul.soulLevel, memories: soul.memories,
@@ -261,6 +311,9 @@ export function useBambooEngine() {
       showJournal, setShowJournal, showAltar, setShowAltar, showSettings, setShowSettings, showMemoryRitual, setShowMemoryRitual, pendingSummary, setPendingSummary,
       backgroundGradient, weather, isDaytime, showEasterEgg, bgVolume, setBgVolume, voiceVolume, setVoiceVolume, selectedAmbience, changeAmbience, season,
       playPaperRustle, playMagicDust, initAudio, triggerLight, motionValues, audioRefs, finalizeMemory, deleteMemory, shareMemory, capturingId: null, isDeleting: null,
-      isHolding, setIsHolding, handlePet 
+      isHolding, setIsHolding, handlePet,
+      letters: soul.letters, generateMonthlyLetter: soul.generateMonthlyLetter, saveVoiceCapsule: soul.saveVoiceCapsule,
+      sleepTimer, startSleepTimer, stopSleepTimer, playIntroBoom,
+      todaysCard: soul.todaysCard, showOracleModal: soul.showOracleModal, confirmOracle: soul.confirmOracle,
   };
 }

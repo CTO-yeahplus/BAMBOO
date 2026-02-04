@@ -1,72 +1,87 @@
 // app/hooks/useAuth.ts
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+// 클라이언트 생성 (싱글톤 유지)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
     auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false // [Fix] URL 감지 비활성화 (충돌 방지)
     }
-});
+  }
+);
 
 export function useAuth() {
   const [user, setUser] = useState<any>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(true);
+  const isMounted = useRef(false);
 
+  // 프로필 가져오기 (에러 무시)
   const fetchProfile = async (uid: string) => {
     try {
       const { data } = await supabase.from('profiles').select('is_premium').eq('id', uid).single();
-      if (data) setIsPremium(data.is_premium);
-    } catch (e) { console.error("Profile fetch error:", e); }
+      if (isMounted.current && data) setIsPremium(data.is_premium);
+    } catch (e) { /* Ignore */ }
   };
 
   useEffect(() => {
-    let mounted = true;
+    isMounted.current = true;
 
-    const checkUser = async () => {
+    // [Fix] 초기 세션 확인과 구독을 하나의 흐름으로 통합
+    const initAuth = async () => {
       try {
+        // 1. 초기 세션 확인
         const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (error) throw error;
-        
-        if (mounted) {
+        // AbortError가 아닌 진짜 에러만 로깅
+        if (error && error.name !== 'AbortError' && !error.message.includes('aborted')) {
+            console.warn("Auth Check Warning:", error.message);
+        }
+
+        if (isMounted.current) {
             const currentUser = session?.user || null;
             setUser(currentUser);
             if (currentUser) await fetchProfile(currentUser.id);
-            setLoading(false);
+            setLoading(false); // 로딩 완료
         }
-      } catch (error: any) {
-        // [Fix] Ignore Abort Errors
-        if (error.message?.includes('aborted') || error.message?.includes('signal') || error.name === 'AbortError') {
-            return;
-        }
-        // node_modules 내부 에러 스택 무시
-        if (error.stack?.includes('locks.ts')) return;
-
-        console.error("Session check error:", error);
-        if (mounted) setLoading(false);
+      } catch (e) {
+          // 모든 초기화 에러 무시하고 로딩 해제 (앱 멈춤 방지)
+          if (isMounted.current) setLoading(false);
       }
     };
 
-    checkUser();
+    initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
+    // 2. 상태 변경 구독
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted.current) return;
+
+      // [Safety] 불필요한 업데이트 방지
       const currentUser = session?.user || null;
-      setUser(currentUser);
-      if (currentUser) await fetchProfile(currentUser.id);
-      else setIsPremium(false);
+      
+      setUser((prev: any) => {
+          // ID가 같으면 상태 변경 안 함 (렌더링 최적화)
+          if (prev?.id === currentUser?.id) return prev;
+          return currentUser;
+      });
+
+      if (currentUser) {
+          await fetchProfile(currentUser.id);
+      } else {
+          setIsPremium(false);
+      }
+      
       setLoading(false);
     });
 
     return () => {
-        mounted = false;
-        subscription.unsubscribe();
+      isMounted.current = false;
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -82,13 +97,10 @@ export function useAuth() {
   };
   
   const signOut = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.warn("Sign out signal aborted (handled)");
-    } finally {
-      setUser(null);
-      setIsPremium(false);
+    await supabase.auth.signOut();
+    if (isMounted.current) {
+        setUser(null);
+        setIsPremium(false);
     }
   };
 
