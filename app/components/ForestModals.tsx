@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Lock, Palette, Unlock, Zap, Sparkles, User, LogOut, Download, Share2, Settings2, Volume2, Mic, Heart, Send, Flame, CloudRain, Wind, Trees, Sliders, Power } from 'lucide-react';
+import { X, Lock, Palette, Unlock, Zap, Sparkles,Trash2, User, LogOut, Download, Share2, Settings2, Volume2, Square, Mic, Heart, Send, Flame, CloudRain, Wind, Trees, Sliders, Power, StopCircle, Play } from 'lucide-react';
 import Image from 'next/image';
 import { Artifact, ARTIFACTS, OracleCard, WhisperBottle, THEMES, ThemeId } from '../types';
 import { toPng } from 'html-to-image'; // [Fix] 교체된 라이브러리
@@ -400,9 +400,11 @@ export const ProfileModal = ({ isOpen, onClose, user, isPremium, signOut, getUse
     );
 };
 
-// --- 5. Bottle Write Modal ---
+// --- 5. Bottle Write Modal (구조 신호 추가됨) ---
 export const BottleWriteModal = ({ isOpen, onClose, onSend }: any) => {
     const [text, setText] = useState("");
+    const [isDistress, setIsDistress] = useState(false); // [Fix] 이 줄이 빠져서 에러가 났습니다.
+
     if (!isOpen) return null;
     return (
         <ModalOverlay onClose={onClose}>
@@ -415,9 +417,29 @@ export const BottleWriteModal = ({ isOpen, onClose, onSend }: any) => {
                     className="w-full h-32 bg-black/20 border border-white/10 rounded-xl p-4 text-white/80 text-sm focus:outline-none focus:border-white/30 resize-none mb-4"
                     maxLength={100}
                 />
+
+                {/* [New] Distress Toggle Button */}
+                <div 
+                    className={`flex items-center justify-between mb-6 p-3 rounded-lg cursor-pointer transition-colors ${isDistress ? 'bg-red-500/10 border border-red-500/20' : 'bg-white/5 border border-white/5'}`} 
+                    onClick={() => setIsDistress(!isDistress)}
+                >
+                    <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${isDistress ? 'bg-red-500/20 text-red-200' : 'bg-white/10 text-white/40'}`}>
+                            <Sparkles size={16} />
+                        </div>
+                        <div className="text-left">
+                            <p className={`text-sm font-medium ${isDistress ? 'text-red-200' : 'text-white/60'}`}>구조 신호 보내기</p>
+                            <p className="text-[10px] text-white/30">수호자들에게 우선적으로 전달됩니다.</p>
+                        </div>
+                    </div>
+                    <div className={`w-8 h-4 rounded-full relative transition-colors ${isDistress ? 'bg-red-500/50' : 'bg-white/10'}`}>
+                        <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${isDistress ? 'translate-x-4' : ''}`} />
+                    </div>
+                </div>
+
                 <div className="flex justify-end">
                     <button 
-                        onClick={() => { if(text.trim()) { onSend(text); setText(""); onClose(); } }}
+                        onClick={() => { if(text.trim()) { onSend(text, isDistress); setText(""); setIsDistress(false); onClose(); } }}
                         disabled={!text.trim()}
                         className="px-6 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 rounded-full text-xs uppercase tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
                     >
@@ -429,24 +451,102 @@ export const BottleWriteModal = ({ isOpen, onClose, onSend }: any) => {
     );
 };
 
-// --- 6. Bottle Read Modal ---
-export const BottleReadModal = ({ bottle, onClose, onLike }: { bottle: WhisperBottle | null, onClose: () => void, onLike: (id: number) => void }) => {
+// --- 6. Bottle Read Modal (녹음 기능 완벽 구현됨) ---
+export const BottleReadModal = ({ bottle, onClose, onLike, onReply, isPremium }: { bottle: WhisperBottle | null, onClose: () => void, onLike: (id: number) => void, onReply: (id: number, blob: Blob) => void, isPremium: boolean }) => {
+    // [Fix] 녹음 관련 상태와 로직 추가
+    const [isRecording, setIsRecording] = useState(false);
+    const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const chunksRef = useRef<Blob[]>([]);
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorderRef.current = new MediaRecorder(stream);
+            chunksRef.current = [];
+
+            mediaRecorderRef.current.ondataavailable = (e) => {
+                if (e.data.size > 0) chunksRef.current.push(e.data);
+            };
+
+            mediaRecorderRef.current.onstop = () => {
+                const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+                setAudioBlob(blob);
+            };
+
+            mediaRecorderRef.current.start();
+            setIsRecording(true);
+        } catch (e) {
+            alert("마이크 권한이 필요합니다.");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        }
+    };
+
     if (!bottle) return null;
+
     return (
-        <ModalOverlay onClose={onClose}>
+        <ModalOverlay onClose={() => {
+            // 모달 닫을 때 녹음 데이터 초기화
+            setAudioBlob(null);
+            setIsRecording(false);
+            onClose();
+        }}>
             <div className="relative bg-[#0c0c0c] border border-[#222] p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center overflow-hidden">
                 <div className="absolute inset-0 bg-blue-900/10" />
                 <div className="absolute bottom-0 inset-x-0 h-1/2 bg-gradient-to-t from-blue-500/10 to-transparent pointer-events-none" />
                 
                 <div className="relative z-10">
+                    {/* Bottle Icon */}
                     <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]">
-                        <span className="text-2xl">🍾</span>
+                        {bottle.is_distress ? <span className="text-2xl animate-pulse">🆘</span> : <span className="text-2xl">🍾</span>}
                     </div>
                     
+                    {/* Content */}
                     <p className="text-white/80 font-serif italic text-lg leading-relaxed mb-8 break-keep">
                         "{bottle.content}"
                     </p>
                     
+                    {/* [New] Guardian Reply UI */}
+                    {isPremium && !bottle.reply_audio_url && (
+                        <div className="mb-8 p-4 bg-white/5 rounded-xl border border-white/5">
+                            <p className="text-[10px] text-yellow-500/70 uppercase tracking-widest mb-3">Guardian's Duty</p>
+                            
+                            {!audioBlob ? (
+                                // 1. 녹음 버튼
+                                <div className="flex flex-col items-center gap-2">
+                                    <button 
+                                        onClick={isRecording ? stopRecording : startRecording}
+                                        className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all ${isRecording ? 'bg-red-500/20 border-red-500 text-red-500 animate-pulse' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white'}`}
+                                    >
+                                        {isRecording ? <Square size={16} fill="currentColor" /> : <Mic size={20} />}
+                                    </button>
+                                    <span className="text-[10px] text-white/30">{isRecording ? "Recording..." : "Reply with Voice"}</span>
+                                </div>
+                            ) : (
+                                // 2. 전송/삭제 버튼
+                                <div className="flex items-center justify-center gap-3">
+                                    <button 
+                                        onClick={() => onReply(bottle.id, audioBlob)}
+                                        className="px-4 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-200 text-xs rounded-full border border-yellow-500/30 flex items-center gap-2 transition-all"
+                                    >
+                                        <Send size={12} /> 답장 보내기
+                                    </button>
+                                    <button onClick={() => setAudioBlob(null)} className="p-2 text-white/30 hover:text-red-400 transition-colors">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Footer Actions */}
                     <div className="flex justify-center gap-4">
                         <button onClick={onClose} className="px-6 py-2 rounded-full border border-white/10 text-white/40 hover:bg-white/5 text-xs transition-colors">닫기</button>
                         <button 

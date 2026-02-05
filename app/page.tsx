@@ -419,7 +419,7 @@ export default function BambooForest() {
 
         {/* [New] Bottle Modals */}
         <BottleWriteModal isOpen={showWriteBottle} onClose={() => setShowWriteBottle(false)} onSend={sendBottle} />
-        <BottleReadModal bottle={foundBottle} onClose={() => setFoundBottle(null)} onLike={likeBottle} />
+        <BottleReadModal bottle={foundBottle} onClose={() => setFoundBottle(null)} onLike={likeBottle} onReply={engine.replyToBottle} isPremium={isPremium} />
 
         {/* Memory Ritual */}
         <MemoryRitual isOpen={engine.showMemoryRitual} onClose={() => engine.setShowMemoryRitual(false)} user={user} isPremium={isPremium} onFinalize={engine.finalizeMemory} onSaveCapsule={engine.saveVoiceCapsule} />

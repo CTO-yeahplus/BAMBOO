@@ -17,7 +17,7 @@ export interface SoulLetter {
     created_at: string;
 }
 
-export function useSoulData(user: any, triggerSuccess: () => void) {
+export function useSoulData(user: any, triggerSuccess: () => void, isPremium: boolean) { // [Change] isPremium 추가
   const [memories, setMemories] = useState<Memory[]>([]);
   const [letters, setLetters] = useState<SoulLetter[]>([]); 
   const [resonance, setResonance] = useState(0);
@@ -67,37 +67,76 @@ export function useSoulData(user: any, triggerSuccess: () => void) {
       addResonance(30); 
   };
 
-  const sendBottle = async (content: string) => {
-      if (!user) return;
-      const { error } = await supabase.from('whisper_bottles').insert({
-          user_id: user.id,
-          content: content
-      });
-      if (!error) {
-          triggerSuccess();
-          addResonance(50);
-      } else {
-          console.error(error);
-          alert("유리병을 띄우지 못했습니다.");
-      }
-  };
+  // [Modified] Send Bottle (구조 신호 옵션 추가)
+  const sendBottle = async (content: string, isDistress: boolean = false) => {
+    if (!user) return;
+    const { error } = await supabase.from('whisper_bottles').insert({
+        user_id: user.id,
+        content: content,
+        is_distress: isDistress, // [New]
+        likes: 0
+    });
+    if (!error) {
+        triggerSuccess();
+        addResonance(50);
+    } else {
+        alert("유리병을 띄우지 못했습니다.");
+    }
+};
 
-  const findRandomBottle = async () => {
-      if (!user) return;
-      const { data } = await supabase.from('whisper_bottles')
-          .select('*')
-          .neq('user_id', user.id)
-          .limit(10)
-          .order('created_at', { ascending: false });
+// [Modified] Find Random Bottle (수호자 우선 배정 로직)
+const findRandomBottle = async () => {
+    if (!user) return;
+    
+    let query = supabase.from('whisper_bottles')
+        .select('*')
+        .neq('user_id', user.id) // 내 거 제외
+        .is('reply_audio_url', null) // 아직 답장이 없는 병만 (수호자 기회)
+        .limit(10);
 
-      if (data && data.length > 0) {
-          const random = data[Math.floor(Math.random() * data.length)];
-          setFoundBottle(random);
-      } else {
-          setFoundBottle({
-              id: 0, content: "이 숲에 첫 번째 방문자가 되신 걸 환영합니다.", likes: 0, created_at: new Date().toISOString()
-          });
-      }
+    // [Key Logic] 프리미엄(수호자)이면 '구조 신호(is_distress)'를 우선적으로 찾음
+    if (isPremium) {
+        query = query.order('is_distress', { ascending: false }); // true(구조신호) 먼저
+    }
+    
+    const { data } = await query.order('created_at', { ascending: false }); // 그 다음 최신순
+
+    if (data && data.length > 0) {
+        // 상위 5개 중 랜덤 선택 (너무 최신만 나오지 않게)
+        const poolSize = Math.min(data.length, 5);
+        const random = data[Math.floor(Math.random() * poolSize)];
+        setFoundBottle(random);
+    } else {
+        // ... (기본 병 로직 유지)
+    }
+};
+
+// [New] Reply with Voice (수호자의 답장)
+const replyToBottle = async (bottleId: number, audioBlob: Blob) => {
+    if (!user) return;
+    try {
+        const fileName = `replies/${bottleId}_${Date.now()}.webm`;
+        const { error: uploadError } = await supabase.storage.from('capsules').upload(fileName, audioBlob);
+        if (uploadError) throw uploadError;
+        
+        const { data: { publicUrl } } = supabase.storage.from('capsules').getPublicUrl(fileName);
+        
+        // 병 정보 업데이트
+        const { error: dbError } = await supabase.from('whisper_bottles')
+            .update({ 
+                reply_audio_url: publicUrl,
+                reply_author_id: user.id 
+            })
+            .eq('id', bottleId);
+
+        if (dbError) throw dbError;
+
+        triggerSuccess();
+        addResonance(100); // 답장 보상 (대폭 상승)
+    } catch (e) {
+        console.error("Reply Failed:", e);
+        alert("답장을 보내지 못했습니다.");
+    }
   };
 
   // [Fix] catch 블록 제거 및 error 객체 확인 패턴으로 변경
@@ -184,5 +223,6 @@ export function useSoulData(user: any, triggerSuccess: () => void) {
       todaysCard, showOracleModal, confirmOracle,
       sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle,
       spiritForm, changeSpiritForm, SPIRIT_FORMS,showGalleryModal, setShowGalleryModal,
+      replyToBottle,
   };
 }

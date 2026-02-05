@@ -85,6 +85,10 @@ export interface WhisperBottle {
   likes: number;
   created_at: string;
   // user_id는 프론트엔드에서 굳이 노출할 필요 없음 (익명성)
+  // [New] Guardian Features
+  is_distress?: boolean;        // 구조 신호 여부 (깊은 고민)
+  reply_audio_url?: string;     // 수호자의 음성 답장 URL
+  reply_author_id?: string;     // 답장한 수호자의 ID (공명도 보상용)
 }
 
 export const ORACLE_DECK: OracleCard[] = [

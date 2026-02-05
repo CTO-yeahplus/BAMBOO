@@ -20,7 +20,7 @@ const DAILY_QUOTES = [
 export function useBambooEngine() {
   const { user, isPremium, signInWithGoogle, signOut } = useAuth();
   const { triggerSuccess, triggerMedium, triggerLight, triggerBreathing } = useHaptic();  
-  const soul = useSoulData(user, triggerSuccess);
+  const soul = useSoulData(user, triggerSuccess, isPremium);
   const [showFireRitual, setShowFireRitual] = useState(false);
   
   const [weather, setWeather] = useState<WeatherType>('clear');
@@ -394,5 +394,6 @@ const {
       isMixerMode, setIsMixerMode,
       mixerVolumes, setMixerVolumes,
       applyPreset, currentTheme, setTheme,
+      replyToBottle: soul.replyToBottle,
   };
 }
