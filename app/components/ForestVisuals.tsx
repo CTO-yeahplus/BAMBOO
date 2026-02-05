@@ -1,12 +1,144 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Memory, FireflyUser } from '../types'; // FireflyUser import 확인
+import React, { useMemo,useState, useEffect } from 'react';
 import { getMoonPhase, getMoonIconPath } from '../utils/moonPhase';
+import { SpiritFormType, ThemeId, Memory, FireflyUser  } from '../types';
+import { motion, useTransform, MotionValue } from 'framer-motion';
+import Image from 'next/image';
 
 // --- Visual Memory Helper Type ---
 type VisualMemory = Memory & { x: number; y: number; unlock_date?: string };
+
+// [New] Dynamic Particle System
+export const ThemeParticles = ({ type }: { type: string }) => {
+    // [Fix] Hydration Mismatch 방지: 클라이언트 로드 여부 확인
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // 서버 렌더링 시에는 아무것도 그리지 않음 (null 반환)
+    // 브라우저에서 마운트된 후에만 무작위 위치 계산하여 렌더링
+    if (!mounted) return null;
+
+    const particles = Array.from({ length: 30 }); // 파티클 개수
+
+    if (type === 'firefly') {
+        // 기존 반딧불이 (유지)
+        return (
+            <>
+                {particles.map((_, i) => (
+                   <motion.div 
+                       key={i} 
+                       className="absolute w-1 h-1 bg-yellow-300 rounded-full blur-[1px]"
+                       initial={{ opacity: 0, scale: 0 }}
+                       animate={{ 
+                           x: [Math.random() * 100, Math.random() * 100 - 50],
+                           y: [Math.random() * 100, Math.random() * 100 - 50],
+                           opacity: [0, 0.8, 0],
+                           scale: [0, 1, 0]
+                       }}
+                       transition={{ duration: 3 + Math.random() * 4, repeat: Infinity }}
+                       style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
+                   />
+                ))}
+            </>
+        );
+    }
+
+    if (type === 'snow') {
+        return (
+            <>
+                {particles.map((_, i) => (
+                    <motion.div
+                        key={i}
+                        className="absolute w-1 h-1 bg-white rounded-full blur-[0.5px]"
+                        initial={{ y: -10, opacity: 0 }}
+                        animate={{ 
+                            y: ['0vh', '100vh'], 
+                            x: ['0px', `${(Math.random() - 0.5) * 50}px`], // 바람에 날리는 효과
+                            opacity: [0, 0.8, 0.8, 0] 
+                        }}
+                        transition={{ duration: 5 + Math.random() * 5, repeat: Infinity, delay: Math.random() * 5, ease: "linear" }}
+                        style={{ left: `${Math.random() * 100}%` }}
+                    />
+                ))}
+            </>
+        );
+    }
+
+    if (type === 'petal') {
+        return (
+            <>
+                {particles.map((_, i) => (
+                    <motion.div
+                        key={i}
+                        className="absolute w-2 h-2 bg-pink-300/60 rounded-full" // 벚꽃잎 모양 (간단히 원형)
+                        initial={{ y: -10, rotate: 0 }}
+                        animate={{ 
+                            y: ['0vh', '100vh'], 
+                            x: ['0px', `${(Math.random() - 0.5) * 200}px`], 
+                            rotate: [0, 360],
+                            opacity: [0, 1, 0]
+                        }}
+                        transition={{ duration: 6 + Math.random() * 4, repeat: Infinity, delay: Math.random() * 5, ease: "linear" }}
+                        style={{ left: `${Math.random() * 100}%`, borderRadius: '40% 60% 70% 30% / 40% 50% 60% 50%' }} // 꽃잎 모양 흉내
+                    />
+                ))}
+            </>
+        );
+    }
+    
+    if (type === 'digital_rain') {
+        return (
+            <>
+                {particles.map((_, i) => (
+                     <motion.div
+                        key={i}
+                        className="absolute w-[1px] bg-green-500/50"
+                        style={{ height: Math.random() * 20 + 10, left: `${Math.random() * 100}%` }}
+                        animate={{ y: ['-100vh', '100vh'], opacity: [0, 1, 0] }}
+                        transition={{ duration: 2 + Math.random(), repeat: Infinity, delay: Math.random() * 2, ease: "linear" }}
+                     />
+                ))}
+            </>
+        );
+    }
+
+    return null;
+};
+
+// [Modified] Background Wrapper
+export const ForestBackground = ({ themeId, themeConfig, children }: { themeId: ThemeId, themeConfig: any, children: React.ReactNode }) => {
+    return (
+        <div className="relative w-full h-full overflow-hidden">
+            {/* 1. Base Gradient Layer (Fallback) */}
+            <div 
+                className="absolute inset-0 transition-colors duration-1000" 
+                style={{ background: themeConfig.bgGradient }} 
+            />
+            
+            {/* 2. Image Layer (Optional: 실제 이미지가 있다면 여기에 Image 컴포넌트 추가) */}
+            {/* <motion.div 
+                key={themeId} // 테마 바뀔 때마다 페이드 인/아웃
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }}
+                className="absolute inset-0"
+            >
+                <Image src={`/images/bg_${themeId}.jpg`} fill className="object-cover opacity-60 mix-blend-overlay" />
+            </motion.div> 
+            */}
+
+            {/* 3. Theme Specific Particles */}
+            <ThemeParticles type={themeConfig.particleType} />
+
+            {/* 4. Content (Children) */}
+            <div className="relative z-10 w-full h-full">
+                {children}
+            </div>
+        </div>
+    );
+};
 
 // --- Small SVG Components (Existing) ---
 export const Hydrangea = ({ className }: { className?: string }) => ( <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.5"><path d="M12 22c4.97 0 9-4.03 9-9s-4.03-9-9-9-9 4.03-9 9 4.03 9 9 9z" className="text-blue-400/30 fill-blue-500/20" style={{ filter: 'blur(4px)' }} /><circle cx="12" cy="12" r="2" className="fill-blue-200" /><circle cx="8" cy="12" r="2" className="fill-purple-200" /><circle cx="16" cy="12" r="2" className="fill-indigo-200" /><circle cx="12" cy="8" r="2" className="fill-blue-200" /><circle cx="12" cy="16" r="2" className="fill-purple-200" /></svg>);
@@ -20,6 +152,45 @@ export const MemoryFlower = ({ emotion, isSelected }: { emotion?: string; isSele
         case 'anger': return <SpiderLily className={`w-8 h-8 ${glowClass} transition-all duration-500`} />; 
         default: return <Moonflower className={`w-8 h-8 ${glowClass} transition-all duration-500`} />; 
     }
+};
+
+// [New] SpiritGuardian with Intimacy Blur
+export const SpiritGuardian = ({ resonance, isBreathing, isHolding, spiritGlowOpacity, equippedItems }: any) => {
+    // Resonance (0~500 기준)에 따라 블러와 스케일 계산
+    // resonance가 높을수록 blur는 0에, scale은 1에 가까워짐
+    const blurValue = useTransform(resonance, [0, 500], [10, 0]); // 0일 때 10px 블러, 500일 때 0px
+    const scaleValue = useTransform(resonance, [0, 500], [0.8, 1]); // 0일 때 0.8배, 500일 때 1배
+    
+    // 호흡/터치 시 기본 스케일 보정
+    const baseScale = isBreathing || isHolding ? 1.05 : 1;
+    
+    // 최종 스케일 (기본 보정 * 공명도 스케일)
+    const finalScale = useTransform(scaleValue, v => v * baseScale);
+
+    return (
+        <motion.div 
+            className="relative w-full h-full rounded-[40px] overflow-hidden cursor-pointer transition-all duration-500"
+            style={{ 
+                scale: finalScale,
+                filter: useTransform(blurValue, v => `blur(${v}px)`) as any
+            }}
+        >
+            <SpiritAura type={equippedItems.aura} />
+            {/* 이미지에 직접 블러를 적용하거나, 부모 div에 적용 */}
+            <Image src="/images/spirit_final.png" alt="Spirit" fill className="object-cover transition-opacity duration-500" />
+            <SpiritAccessory type={equippedItems.head} />
+            
+            {/* 오버레이들도 같이 블러 처리되거나, 선명도를 위해 분리할 수 있음 */}
+            <motion.div className="absolute inset-0 bg-white mix-blend-overlay z-30" style={{ opacity: spiritGlowOpacity }} />
+            <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-white/5 to-white/10 mix-blend-overlay" />
+            
+            {/* 공명도가 낮을 때 나타나는 안개 효과 */}
+            <motion.div 
+                className="absolute inset-0 bg-white/10 mix-blend-screen pointer-events-none"
+                style={{ opacity: useTransform(resonance, [0, 300], [0.5, 0]) }}
+            />
+        </motion.div>
+    );
 };
 
 export const GoldenCocoon = ({ isLocked }: { isLocked: boolean }) => ( <div className="relative group"> <div className="absolute inset-0 bg-yellow-500/30 blur-xl rounded-full animate-pulse" /> {isLocked ? ( <svg viewBox="0 0 24 24" className="w-10 h-10 drop-shadow-[0_0_15px_rgba(234,179,8,0.6)]" fill="none"> <line x1="12" y1="0" x2="12" y2="4" stroke="rgba(255,255,255,0.3)" strokeWidth="1" /> <path d="M12 4C9 4 7 8 7 13C7 18 9 22 12 22C15 22 17 18 17 13C17 8 15 4 12 4Z" className="fill-yellow-600/80 stroke-yellow-200" strokeWidth="1.5" /> <path d="M8 10C9 11 11 11.5 12 11C13 10.5 15 11 16 12" stroke="rgba(255,255,255,0.4)" strokeLinecap="round" /> <path d="M8 14C9 15 11 15.5 12 15C13 14.5 15 15 16 16" stroke="rgba(255,255,255,0.4)" strokeLinecap="round" /> </svg> ) : ( <svg viewBox="0 0 24 24" className="w-12 h-12 drop-shadow-[0_0_20px_rgba(250,204,21,0.8)] animate-[bounce_3s_infinite]"> <path d="M12 12C12 12 8 6 4 8C0 10 2 16 6 16C8 16 11 14 12 12Z" className="fill-yellow-300 opacity-90" /> <path d="M12 12C12 12 16 6 20 8C24 10 22 16 18 16C16 16 13 14 12 12Z" className="fill-yellow-300 opacity-90" /> <path d="M12 12C12 12 10 18 8 20C6 22 4 20 6 18C8 16 11 14 12 12Z" className="fill-yellow-500 opacity-80" /> <path d="M12 12C12 12 14 18 16 20C18 22 20 20 18 18C16 16 13 14 12 12Z" className="fill-yellow-500 opacity-80" /> </svg> )} </div> );
@@ -268,4 +439,166 @@ export const BurningPaperEffect = ({ isBurning, onComplete }: { isBurning: boole
             ))}
         </div>
     );
+};
+
+// [New] 1단계: Wisp (빛의 구체)
+export const SpiritWisp = () => {
+    // 난수 생성 헬퍼 (SSR 문제 방지 위해 고정값 사용 권장되나, 시각효과를 위해 약간의 변칙 사용)
+    const orbits = Array.from({ length: 6 }).map((_, i) => ({
+        id: i,
+        radius: 40 + i * 8, // 궤도 반경 다르게
+        duration: 4 + i * 1.5, // 속도 다르게
+        delay: i * 0.5,
+        reverse: i % 2 === 0, // 반대 방향 회전 섞기
+    }));
+
+    return (
+        <div className="relative w-48 h-48 flex items-center justify-center">
+            {/* 1. Deep Core Plasma (중심부의 요동치는 에너지) */}
+            <motion.div
+                className="absolute w-20 h-20 rounded-full bg-gradient-to-br from-blue-300 via-cyan-200 to-white blur-md mix-blend-screen z-20"
+                animate={{
+                    scale: [1, 1.3, 0.9, 1.2, 1],
+                    rotate: [0, 90, 180, 270, 360],
+                    borderRadius: ["50% 50% 50% 50%", "60% 40% 70% 30%", "50% 50% 50% 50%"] // 형태 일그러짐
+                }}
+                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+            />
+            
+            {/* 2. Inner Glow Halo (강렬한 내부 광채) */}
+            <motion.div 
+                className="absolute w-24 h-24 bg-blue-100/60 rounded-full blur-[15px] z-10"
+                animate={{ scale: [1, 1.5, 1.2, 1.6, 1], opacity: [0.6, 1, 0.7, 0.9, 0.6] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", times: [0, 0.2, 0.5, 0.8, 1] }}
+            />
+
+            {/* 3. Outer Ethereal Field (은은하게 퍼지는 외부 오라) */}
+            <motion.div 
+                className="absolute inset-0 bg-cyan-400/20 rounded-full blur-[40px] mix-blend-overlay"
+                animate={{ scale: [0.8, 1.2, 0.9], opacity: [0.2, 0.5, 0.2] }}
+                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+            />
+
+            {/* 4. Dynamic Orbiting Particles (궤도를 도는 위성들) */}
+            <div className="absolute inset-0 animate-[spin_20s_linear_infinite]"> {/* 전체가 천천히 회전 */}
+                {orbits.map(orb => (
+                    <motion.div
+                        key={orb.id}
+                        className="absolute top-1/2 left-1/2 w-1 h-1"
+                        animate={{ rotate: orb.reverse ? -360 : 360 }}
+                        transition={{ duration: orb.duration, repeat: Infinity, ease: "linear", delay: orb.delay }}
+                    >
+                        <motion.div 
+                            className="relative w-3 h-3 rounded-full bg-white blur-[1px] shadow-[0_0_10px_rgba(150,240,255,0.8)]"
+                            style={{ left: orb.radius }}
+                            animate={{ scale: [1, 1.5, 0.5, 1], opacity: [0.5, 1, 0.3, 0.5] }}
+                            transition={{ duration: 3, repeat: Infinity }}
+                        >
+                             {/* Particle Trail */}
+                             <div className="absolute right-full top-0 h-full w-10 bg-gradient-to-l from-white/50 to-transparent blur-sm" />
+                        </motion.div>
+                    </motion.div>
+                ))}
+            </div>
+            
+            {/* 5. Occasional Sparkles (중앙에서 터져나오는 빛) */}
+             <motion.div 
+                 className="absolute z-30 w-1 h-1 bg-white rounded-full shadow-[0_0_20px_white]"
+                 initial={{ opacity: 0, scale: 0 }}
+                 animate={{ opacity: [0, 1, 0], scale: [0, 3, 0] }}
+                 transition={{ duration: 2, repeat: Infinity, delay: 1, repeatDelay: 3 }}
+             />
+        </div>
+    );
+};
+
+// [Enhanced] 2단계: Spirit Fox (빛으로 빚어진 영물)
+export const SpiritFox = () => {
+    // SVG Path 정의
+    const bodyPath = "M30 60 Q50 85 70 60 L65 85 Q50 95 35 85 Z"; // 몸통 및 다리
+    const tailEarPath = "M30 60 Q20 40 35 25 Q45 15 50 30 Q55 15 65 25 Q80 40 70 60 Q85 45 95 30 Q90 20 80 30 Q70 40 70 60"; // 귀와 거대한 꼬리
+
+    return (
+        <div className="relative w-72 h-72 flex items-center justify-center">
+             
+             {/* 1. Background Aura (뒤쪽의 은은한 오라) */}
+             <div className="absolute inset-0 bg-blue-500/10 blur-[50px] rounded-full animate-pulse mix-blend-screen" />
+             
+             {/* 2. Rising Spirit Dust (바닥에서 올라오는 영혼의 먼지) */}
+             {Array.from({ length: 15 }).map((_, i) => (
+                <motion.div
+                    key={`dust-${i}`}
+                    className="absolute bottom-10 w-1 h-1 bg-blue-200 rounded-full blur-[1px]"
+                    style={{ left: `${20 + Math.random() * 60}%` }}
+                    animate={{ y: -150, opacity: [0, 0.8, 0], scale: [0, Math.random() * 2 + 1, 0] }}
+                    transition={{ duration: 3 + Math.random() * 2, repeat: Infinity, delay: Math.random() * 2, ease: "easeOut" }}
+                />
+             ))}
+
+             <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible relative z-20 drop-shadow-[0_0_10px_rgba(150,220,255,0.5)]">
+                
+                {/* 3. Ethereal Body Fill (반투명하게 채워진 몸체) */}
+                <motion.path
+                     d={bodyPath}
+                     fill="url(#fox-gradient)" // 하단 defs 참조
+                     stroke="none"
+                     initial={{ opacity: 0 }}
+                     animate={{ opacity: [0.2, 0.4, 0.2] }} // 은은하게 깜빡임
+                     transition={{ duration: 4, repeat: Infinity }}
+                />
+
+                {/* 4. Flowing Energy Strokes (빛이 흐르는 듯한 외곽선) */}
+                {[bodyPath, tailEarPath].map((path, i) => (
+                    <motion.path
+                        key={i}
+                        d={path}
+                        fill="none"
+                        stroke="url(#light-flow)" // 하단 defs 참조
+                        strokeWidth={i === 0 ? "1.5" : "2"} // 꼬리 쪽을 더 두껍게
+                        strokeLinecap="round"
+                        strokeDasharray="10 20" // 점선 패턴
+                        animate={{ strokeDashoffset: [0, -30] }} // 빛이 흘러가는 애니메이션
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    />
+                ))}
+                
+                {/* 5. Glowing Eyes (강렬하게 빛나는 눈) */}
+                <motion.circle cx="42" cy="45" r="1.5" fill="white" animate={{ r: [1.5, 2.5, 1.5], opacity: [0.8, 1, 0.8] }} transition={{ duration: 2, repeat: Infinity }} className="drop-shadow-[0_0_5px_white]" />
+                <motion.circle cx="58" cy="45" r="1.5" fill="white" animate={{ r: [1.5, 2.5, 1.5], opacity: [0.8, 1, 0.8] }} transition={{ duration: 2, repeat: Infinity, delay: 0.1 }} className="drop-shadow-[0_0_5px_white]" />
+
+                {/* Gradients Definitions */}
+                <defs>
+                    {/* 몸체 채우기용 그라데이션 */}
+                    <linearGradient id="fox-gradient" x1="0%" y1="100%" x2="0%" y2="0%">
+                        <stop offset="0%" stopColor="#90cdf4" stopOpacity="0.1" />
+                        <stop offset="100%" stopColor="white" stopOpacity="0.3" />
+                    </linearGradient>
+                    {/* 흐르는 빛용 그라데이션 (스트로크) */}
+                    <linearGradient id="light-flow" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#a5f3fc" />
+                        <stop offset="50%" stopColor="white" />
+                        <stop offset="100%" stopColor="#a5f3fc" />
+                    </linearGradient>
+                </defs>
+             </svg>
+        </div>
+    );
+};
+
+// [New] Spirit Renderer (통합 컴포넌트)
+export const SpiritRenderer = ({ form, hasWoken, isBreathing }: { form: SpiritFormType, hasWoken: boolean, isBreathing: boolean }) => {
+    // Breathing Animation
+    const breatheAnim = isBreathing ? { scale: [1, 1.1, 1], opacity: 0.8 } : {};
+
+    switch (form) {
+        case 'wisp':
+            return <motion.div animate={breatheAnim} transition={{ duration: 4, repeat: Infinity }}><SpiritWisp /></motion.div>;
+        case 'fox':
+            return <motion.div animate={breatheAnim} transition={{ duration: 4, repeat: Infinity }}><SpiritFox /></motion.div>;
+        case 'guardian':
+        default:
+            // 기존의 Image 컴포넌트는 page.tsx에서 처리하거나 여기서 처리
+            // 여기서는 자리만 잡아주고 실제 렌더링은 page.tsx의 로직을 따름
+            return null; 
+    }
 };

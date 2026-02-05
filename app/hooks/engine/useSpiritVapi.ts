@@ -91,15 +91,35 @@ export function useSpiritVapi(
     };
   }, [onCallEnd, analyzeEmotion, requestWakeLock, releaseWakeLock]);
 
-  const toggleCall = async () => {
+
+  const toggleCall = useCallback(async () => {
     const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
 
-    if (callStatus === 'idle') {
+    // 1. [Stop Logic] 통화 중이거나, 연결 시도 중이거나, 말하는 중일 때 -> 무조건 끊기
+    // (모든 활성 상태를 체크하여 반응성을 높입니다)
+    if (callStatus === 'active' || callStatus === 'connecting' || callStatus === 'listening' || callStatus === 'speaking' || callStatus === 'processing') {
+      console.log("🛑 Stopping Call (User Triggered)...");
+      
+      // SDK에 중지 명령
+      if (vapiRef.current) {
+          vapiRef.current.stop(); 
+      }
+      
+      // [Key Fix] 이벤트를 기다리지 않고 '즉시' UI를 초기화합니다.
+      setCallStatus('idle'); 
+      releaseWakeLock();
+      onCallEnd(); // 저장 로직 실행
+    } 
+    // 2. [Start Logic] 대기 중일 때 -> 전화 걸기
+    else { // callStatus === 'idle'
       if (!assistantId) {
           alert("Vapi Assistant ID가 설정되지 않았습니다.");
           return;
       }
-      setCallStatus('connecting');
+      
+      console.log("📞 Starting Call...");
+      setCallStatus('connecting'); // UI를 즉시 '연결 중'으로 변경
+
       try {
         await vapiRef.current.start(assistantId);
       } catch (e) {
@@ -107,17 +127,9 @@ export function useSpiritVapi(
         setCallStatus('idle');
         alert("통화 연결에 실패했습니다. 마이크 권한을 확인해주세요.");
       }
-    } else {
-      // [Fix] 종료 버튼 클릭 시 강제 종료 로직 강화
-      console.log("🛑 Stopping Call...");
-      vapiRef.current.stop();
-      
-      // Vapi 이벤트가 늦게 올 수 있으므로 UI 상태를 강제로 정리
-      // (잠시 후 'call-end' 이벤트가 오면 다시 idle로 설정되겠지만, 즉각적인 반응을 위해)
-      // setCallStatus('idle'); // <-- 이 줄은 'call-end' 이벤트를 믿고 생략하거나, 반응이 너무 느리면 추가하세요.
-      releaseWakeLock();
     }
-  };
+  }, [callStatus, onCallEnd, releaseWakeLock]);
+
 
   const sendTextMessage = (text: string) => {
       if (vapiRef.current && (callStatus === 'active' || callStatus === 'listening' || callStatus === 'speaking')) {

@@ -3,6 +3,51 @@
 export type WeatherType = 'clear' | 'rain' | 'snow' | 'ember';
 export type CallStatus = 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'processing';
 export type SeasonType = 'spring' | 'summer' | 'autumn' | 'winter';
+export type ThemeId = 'bamboo' | 'aurora' | 'sakura' | 'cyberpunk';
+
+export interface ThemeConfig {
+  id: ThemeId;
+  name: string;
+  description: string;
+  bgGradient: string; // 이미지 없을 때 사용할 CSS 배경
+  particleType: 'firefly' | 'snow' | 'petal' | 'digital_rain';
+  soundPreset: 'focus' | 'sleep' | 'morning'; // 기존 소닉 아키텍처 프리셋과 연동
+}
+
+export const THEMES: ThemeConfig[] = [
+  { 
+      id: 'bamboo', 
+      name: 'Bamboo Origin', 
+      description: '마음의 고향, 평온한 대나무 숲', 
+      bgGradient: 'linear-gradient(to bottom, #1a2e1a, #0d1a0d)', 
+      particleType: 'firefly',
+      soundPreset: 'focus'
+  },
+  { 
+      id: 'aurora', 
+      name: 'Aurora Night', 
+      description: '별이 쏟아지는 극지의 밤', 
+      bgGradient: 'linear-gradient(to bottom, #0f172a, #312e81, #4c1d95)', 
+      particleType: 'snow',
+      soundPreset: 'sleep'
+  },
+  { 
+      id: 'sakura', 
+      name: 'Spring Blossom', 
+      description: '따스한 바람과 흩날리는 벚꽃', 
+      bgGradient: 'linear-gradient(to bottom, #fff1f2, #fbcfe8, #f472b6)', 
+      particleType: 'petal',
+      soundPreset: 'morning'
+  },
+  { 
+      id: 'cyberpunk', 
+      name: 'Rainy Cyber', 
+      description: '네온 사인이 비치는 비 오는 거리', 
+      bgGradient: 'linear-gradient(to bottom, #020617, #1e1b4b, #be185d)', 
+      particleType: 'digital_rain',
+      soundPreset: 'sleep'
+  }
+];
 
 export interface Particle {
   id: number;
@@ -94,4 +139,29 @@ export const ARTIFACTS: Artifact[] = [
     { id: 'aura_ember', type: 'aura', name: "Warmth of Hearth", description: "따뜻한 온기가 감돕니다.", cost: 300, icon: "🔥" },
     { id: 'head_flower', type: 'head', name: "Bloom Crown", description: "봄에 핀 첫 꽃으로 만든 화관.", cost: 100, icon: "🌸" },
     { id: 'head_fox', type: 'head', name: "Mystic Mask", description: "오래된 여우 가면.", cost: 500, icon: "🦊" },
+];
+
+// [New] Spirit Form Type
+export type SpiritFormType = 'wisp' | 'fox' | 'guardian';
+
+export const SPIRIT_FORMS: { id: SpiritFormType, name: string, minResonance: number, desc: string }[] = [
+    { id: 'wisp', name: 'Lumina Wisp', minResonance: 0, desc: '순수한 영혼의 불꽃' },
+    { id: 'fox', name: 'Mystic Fox', minResonance: 100, desc: '지혜로운 숲의 인도자' },
+    { id: 'guardian', name: 'Forest Guardian', minResonance: 300, desc: '숲을 지키는 수호자' },
+];
+
+// [New] Memory Illustration Type
+export interface MemoryIllustration {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string; // 고화질 이미지 경로
+  thumbnailUrl: string; // (선택) 저화질 썸네일 경로, 없으면 imageUrl을 블러 처리
+  unlockResonance: number; // 해금에 필요한 최소 공명도
+}
+
+export const MEMORY_GALLERY: MemoryIllustration[] = [
+  { id: 'mem_1', title: '첫 번째 만남', description: '안개 낀 숲에서 처음 마주친 순간.', imageUrl: '/images/memories/meet.png', thumbnailUrl: '/images/memories/meet_thumb.png', unlockResonance: 50 },
+  { id: 'mem_2', title: '비 개인 오후', description: '나뭇잎 사이로 햇살이 비추던 날.', imageUrl: '/images/memories/rain.png', thumbnailUrl: '/images/memories/rain_thumb.png', unlockResonance: 150 },
+  { id: 'mem_3', title: '함께 본 별', description: '밤하늘을 수놓은 별들을 바라보며.', imageUrl: '/images/memories/stars.png', thumbnailUrl: '/images/memories/stars_thumb.png', unlockResonance: 300 },
 ];

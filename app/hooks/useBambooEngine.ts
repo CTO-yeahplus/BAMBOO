@@ -8,7 +8,7 @@ import { useParallax } from './useParallax';
 
 import { useSoulData } from './engine/useSoulData';
 import { useSpiritVapi } from './engine/useSpiritVapi';
-import { ARTIFACTS, TIME_THEMES, EMOTION_COLORS, WeatherType, SeasonType } from '../types';
+import { ARTIFACTS, TIME_THEMES, EMOTION_COLORS, WeatherType, SeasonType,THEMES, ThemeId } from '../types';
 
 const DAILY_QUOTES = [
   "천천히 가도 괜찮아, 방향만 맞다면.", "비바람이 불어야 뿌리가 단단해지는 법이야.",
@@ -19,9 +19,7 @@ const DAILY_QUOTES = [
 
 export function useBambooEngine() {
   const { user, isPremium, signInWithGoogle, signOut } = useAuth();
-  const { triggerSuccess, triggerMedium, triggerLight, triggerBreathing } = useHaptic();
-  const { playPaperRustle, playMagicDust, playWindChime, playWaterDrop, initAudio, playIntroBoom } = useSoundEngine();
-  
+  const { triggerSuccess, triggerMedium, triggerLight, triggerBreathing } = useHaptic();  
   const soul = useSoulData(user, triggerSuccess);
   const [showFireRitual, setShowFireRitual] = useState(false);
   
@@ -45,7 +43,7 @@ export function useBambooEngine() {
   }, [triggerLight, soul]);
 
   const voice = useSpiritVapi(user?.id ?? null, handleCallEnd, handleEmotionDetected);
-
+  const [currentTheme, setCurrentTheme] = useState<ThemeId>('bamboo');
   const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({ clear: null, rain: null, snow: null, ember: null });
   const fadeIntervals = useRef<{ [key in WeatherType]: NodeJS.Timeout | null }>({ clear: null, rain: null, snow: null, ember: null });
 
@@ -53,6 +51,21 @@ export function useBambooEngine() {
   const smoothOptions = { stiffness: 100, damping: 20 };
   const mouseX = useSpring(rawX, smoothOptions);
   const mouseY = useSpring(rawY, smoothOptions);
+
+  // [New] Change Theme Logic
+  const setTheme = (themeId: ThemeId) => {
+    setCurrentTheme(themeId);
+    
+    // 테마에 맞는 사운드 프리셋 자동 적용 (useSoundEngine의 applyPreset 활용)
+    const themeConfig = THEMES.find(t => t.id === themeId);
+    if (themeConfig && applyPreset) { // applyPreset이 정의되어 있는지 확인
+        applyPreset(themeConfig.soundPreset);
+    }
+    
+    // 시각적 피드백 (햅틱 + 파티클)
+    triggerSuccess();
+    playMagicDust();
+  };
 
   const volumeMotion = useMotionValue(0);
   useEffect(() => {
@@ -93,6 +106,21 @@ export function useBambooEngine() {
   
   const [bgVolume, setBgVolume] = useState(0.5);
   const [voiceVolume, setVoiceVolume] = useState(1.0);
+
+const { 
+    playPaperRustle, 
+    playMagicDust, 
+    playWindChime, 
+    playWaterDrop, 
+    initAudio, 
+    playIntroBoom,
+    // [New] 믹서 관련 기능들도 여기서 꺼냅니다
+    isMixerMode, 
+    setIsMixerMode, 
+    mixerVolumes, 
+    setMixerVolumes, 
+    applyPreset
+} = useSoundEngine(selectedAmbience, bgVolume); // <--- [Fix] 여기에 인자를 넣어주세요!
 
   // [New] Mobile Audio Warm-up
   const startExperience = useCallback(() => {
@@ -357,6 +385,14 @@ export function useBambooEngine() {
       likeBottle: soul.likeBottle, 
       foundBottle: soul.foundBottle, 
       setFoundBottle: soul.setFoundBottle,
-      showFireRitual, setShowFireRitual, performFireRitual 
+      showFireRitual, setShowFireRitual, performFireRitual,
+      spiritForm: soul.spiritForm,
+      changeSpiritForm: soul.changeSpiritForm,
+      SPIRIT_FORMS: soul.SPIRIT_FORMS,
+      showGalleryModal: soul.showGalleryModal,
+      setShowGalleryModal: soul.setShowGalleryModal,
+      isMixerMode, setIsMixerMode,
+      mixerVolumes, setMixerVolumes,
+      applyPreset, currentTheme, setTheme,
   };
 }

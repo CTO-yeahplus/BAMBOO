@@ -2,12 +2,14 @@
 
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Lock, Unlock, Zap, Sparkles, User, LogOut, Download, Share2, Settings2, Volume2, Mic, Heart, Send, Flame } from 'lucide-react';
+import { X, Lock, Palette, Unlock, Zap, Sparkles, User, LogOut, Download, Share2, Settings2, Volume2, Mic, Heart, Send, Flame, CloudRain, Wind, Trees, Sliders, Power } from 'lucide-react';
 import Image from 'next/image';
-import { Artifact, ARTIFACTS, OracleCard, WhisperBottle } from '../types';
+import { Artifact, ARTIFACTS, OracleCard, WhisperBottle, THEMES, ThemeId } from '../types';
 import { toPng } from 'html-to-image'; // [Fix] 교체된 라이브러리
 import QRCode from 'react-qr-code';
 import { BurningPaperEffect } from './ForestVisuals'; 
+import { SpiritFormType, SPIRIT_FORMS } from '../types'; 
+import { SpiritWisp, SpiritFox } from './ForestVisuals'; // Import Visuals
 
 // --- Helper Components ---
 const ModalOverlay = ({ children, onClose }: { children: React.ReactNode, onClose: () => void }) => (
@@ -128,47 +130,255 @@ export const OracleModal = ({ isOpen, card, onConfirm }: { isOpen: boolean; card
 };
 
 // --- 2. Settings Modal ---
-export const SettingsModal = ({ isOpen, onClose, bgVolume, setBgVolume, voiceVolume, setVoiceVolume }: any) => {
+export const SettingsModal = ({ 
+    isOpen, onClose, 
+    bgVolume, setBgVolume, voiceVolume, setVoiceVolume, // Master Volumes
+    isMixerMode, setIsMixerMode, mixerVolumes, setMixerVolumes, applyPreset, // Mixer Props
+    currentTheme, setTheme, isPremium
+}: any) => {
+
+    const [tab, setTab] = useState<'audio' | 'dreamscapes'>('audio'); // Tab State
+    
     if (!isOpen) return null;
+
+    const channels = [
+        { id: 'forest', icon: <Trees size={18} />, label: 'Forest', color: 'bg-green-500' },
+        { id: 'rain', icon: <CloudRain size={18} />, label: 'Rain', color: 'bg-blue-500' },
+        { id: 'wind', icon: <Wind size={18} />, label: 'Wind', color: 'bg-gray-400' },
+        { id: 'ember', icon: <Flame size={18} />, label: 'Fire', color: 'bg-orange-500' },
+    ];
+
     return (
         <ModalOverlay onClose={onClose}>
-            <div className="bg-[#1a1a1a] border border-[#333] p-6 rounded-2xl shadow-2xl">
-                <div className="flex justify-between items-center mb-6"><h2 className="text-white text-lg font-medium flex items-center gap-2"><Settings2 size={18} /> Settings</h2><button onClick={onClose}><X className="text-white/50 hover:text-white" /></button></div>
-                <div className="space-y-6">
-                    <div><label className="flex items-center gap-2 text-white/60 text-sm mb-3"><Volume2 size={14} /> Ambience Volume</label><input type="range" min="0" max="1" step="0.01" value={bgVolume} onChange={(e) => setBgVolume(parseFloat(e.target.value))} className="w-full accent-white h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" /></div>
-                    <div><label className="flex items-center gap-2 text-white/60 text-sm mb-3"><Mic size={14} /> Voice Volume</label><input type="range" min="0" max="2" step="0.1" value={voiceVolume} onChange={(e) => setVoiceVolume(parseFloat(e.target.value))} className="w-full accent-white h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" /></div>
+            <div className="bg-[#121212] border border-white/10 p-6 rounded-3xl shadow-2xl w-full max-w-sm relative overflow-hidden min-h-[400px] flex flex-col">                
+                {/* Header with Tabs */}
+                <div className="flex items-center gap-4 mb-6 pb-4 border-b border-white/5">
+                    <button 
+                        onClick={() => setTab('audio')}
+                        className={`text-sm font-medium transition-colors flex items-center gap-2 ${tab === 'audio' ? 'text-white' : 'text-white/40 hover:text-white'}`}
+                    >
+                         <Sliders size={16} /> Audio
+                    </button>
+                    <div className="w-px h-4 bg-white/10" />
+                    <button 
+                        onClick={() => setTab('dreamscapes')}
+                        className={`text-sm font-medium transition-colors flex items-center gap-2 ${tab === 'dreamscapes' ? 'text-purple-300' : 'text-white/40 hover:text-white'}`}
+                    >
+                         <Palette size={16} /> Dreamscapes
+                    </button>
+                    <button onClick={onClose} className="ml-auto"><X className="text-white/30 hover:text-white" /></button>
                 </div>
-                <div className="mt-8 pt-4 border-t border-white/10 text-center"><p className="text-[10px] text-white/20 uppercase tracking-widest">Bamboo Forest v1.0</p></div>
+
+                {/* CONTENT: AUDIO (Existing) */}
+                {tab === 'audio' && (
+                    <div className="animate-in fade-in slide-in-from-left-4 duration-300">
+
+                        {/* 1. Master Volume Section */}
+                        <div className="mb-8 space-y-4">
+                            <div className="flex items-center gap-4">
+                                <Volume2 size={16} className="text-white/40" />
+                                <div className="flex-1">
+                                    <label className="text-xs text-white/40 mb-1 block">Master Ambience</label>
+                                    <input 
+                                        type="range" min="0" max="1" step="0.05" 
+                                        value={bgVolume} onChange={(e) => setBgVolume(parseFloat(e.target.value))}
+                                        className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="w-4" /> {/* Indent */}
+                                <div className="flex-1">
+                                    <label className="text-xs text-white/40 mb-1 block">Spirit Voice</label>
+                                    <input 
+                                        type="range" min="0" max="1" step="0.05" 
+                                        value={voiceVolume} onChange={(e) => setVoiceVolume(parseFloat(e.target.value))}
+                                        className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="h-px bg-white/5 mb-8" />
+
+                        {/* 2. Mixer Mode Toggle */}
+                        <div className="flex justify-between items-center mb-6">
+                            <span className="text-sm text-white/80 font-medium">Custom Mix</span>
+                            <button 
+                                onClick={() => setIsMixerMode(!isMixerMode)}
+                                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isMixerMode ? 'bg-green-500/20 border border-green-500/50' : 'bg-white/5 border border-white/10'}`}
+                            >
+                                <div className={`absolute top-1 left-1 w-3.5 h-3.5 bg-white rounded-full shadow-sm transition-transform duration-300 ${isMixerMode ? 'translate-x-6 bg-green-400' : 'bg-white/30'}`} />
+                            </button>
+                        </div>
+
+                        {/* 3. Mixer Controls (Visible only when Mixer Mode is ON) */}
+                        <div className={`space-y-5 transition-all duration-500 ${isMixerMode ? 'opacity-100 translate-y-0' : 'opacity-30 pointer-events-none blur-[2px]'}`}>
+                            {channels.map((ch) => (
+                                <div key={ch.id} className="flex items-center gap-4">
+                                    <div className={`p-2 rounded-lg bg-white/5 text-white/60 ${isMixerMode ? 'text-white' : ''}`}>
+                                        {ch.icon}
+                                    </div>
+                                    <div className="flex-1">
+                                        <input 
+                                            type="range" min="0" max="1" step="0.05"
+                                            disabled={!isMixerMode}
+                                            value={mixerVolumes?.[ch.id] ?? 0}
+                                            onChange={(e) => setMixerVolumes((prev: any) => ({ ...prev, [ch.id]: parseFloat(e.target.value) }))}
+                                            className={`w-full h-1 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white ${isMixerMode ? 'bg-white/20' : 'bg-white/5'}`}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* 4. Presets */}
+                        {isMixerMode && (
+                            <div className="mt-8 grid grid-cols-3 gap-2">
+                                {['Focus', 'Sleep', 'Morning'].map((preset) => (
+                                    <button 
+                                        key={preset}
+                                        onClick={() => applyPreset(preset.toLowerCase())}
+                                        className="py-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-xs text-white/50 hover:text-white transition-all uppercase tracking-wider"
+                                    >
+                                        {preset}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {/* CONTENT: DREAMSCAPES (New) */}
+                {tab === 'dreamscapes' && (
+                    <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-right-4 duration-300 overflow-y-auto">
+                        {THEMES.map((theme) => {
+                            const isLocked = !isPremium && theme.id !== 'bamboo';
+                            const isSelected = currentTheme === theme.id;
+                            
+                            return (
+                                <button
+                                    key={theme.id}
+                                    onClick={() => {
+                                        if (isLocked) {
+                                            alert("프리미엄 구독 시 모든 테마가 해금됩니다.");
+                                            return;
+                                        }
+                                        setTheme(theme.id);
+                                    }}
+                                    className={`relative aspect-[4/3] rounded-xl overflow-hidden border transition-all text-left group ${isSelected ? 'border-purple-500 ring-2 ring-purple-500/20' : 'border-white/10 hover:border-white/30'}`}
+                                >
+                                    {/* Preview Background (Gradient) */}
+                                    <div className="absolute inset-0" style={{ background: theme.bgGradient }} />
+                                    
+                                    {/* Overlay */}
+                                    <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+
+                                    {/* Info */}
+                                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+                                        <p className="text-white font-medium text-xs">{theme.name}</p>
+                                    </div>
+
+                                    {/* Selected Indicator */}
+                                    {isSelected && <div className="absolute top-2 right-2 w-2 h-2 bg-purple-500 rounded-full shadow-[0_0_5px_purple]" />}
+
+                                    {/* Lock Icon */}
+                                    {isLocked && (
+                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[1px]">
+                                            <Lock size={20} className="text-white/50" />
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </ModalOverlay>
     );
 };
 
-// --- 3. Altar Modal ---
-export const AltarModal = ({ isOpen, onClose, resonance, artifacts, ownedItems, equippedItems, onUnlock, onEquip }: any) => {
+// [Modified] Altar Modal
+export const AltarModal = ({ isOpen, onClose, resonance, artifacts, ownedItems, equippedItems, onUnlock, onEquip, spiritForm, changeSpiritForm }: any) => {
+    // Tab State: 'items' | 'spirit'
+    const [tab, setTab] = useState<'items' | 'spirit'>('items');
+
     if (!isOpen) return null;
+
     return (
         <ModalOverlay onClose={onClose}>
             <div className="bg-[#0f0f0f] border border-[#222] rounded-2xl overflow-hidden shadow-2xl h-[70vh] flex flex-col">
-                <div className="p-6 border-b border-white/5 flex justify-between items-center bg-black/20"><div className="flex items-center gap-3"><h2 className="text-white/90 font-serif italic text-xl">Spirit Altar</h2><span className="px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded text-yellow-200 text-xs font-mono">Resonance: {resonance}</span></div><button onClick={onClose}><X className="text-white/50 hover:text-white" /></button></div>
-                <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 gap-4">
-                    {artifacts.map((item: Artifact) => {
-                        const isOwned = ownedItems.includes(item.id);
-                        const isEquipped = equippedItems[item.type] === item.id;
-                        return (
-                            <div key={item.id} className={`relative p-4 rounded-xl border transition-all flex flex-col gap-2 ${isOwned ? 'bg-white/5 border-white/10' : 'bg-black/40 border-white/5 opacity-60'}`}>
-                                <div className="flex justify-between items-start"><span className="text-2xl">{item.icon}</span>{isEquipped && <span className="text-[10px] bg-green-500/20 text-green-300 px-1.5 py-0.5 rounded border border-green-500/30">EQUIPPED</span>}</div>
-                                <div><h3 className="text-white/90 text-sm font-medium">{item.name}</h3><p className="text-white/40 text-[10px] mt-1 line-clamp-2">{item.description}</p></div>
-                                <div className="mt-auto pt-3">
-                                    {isOwned ? (
-                                        <button onClick={() => onEquip(item)} className={`w-full py-2 text-xs font-medium rounded-lg border transition-colors ${isEquipped ? 'bg-white/10 border-white/20 text-white' : 'bg-transparent border-white/10 text-white/50 hover:bg-white/5 hover:text-white'}`}>{isEquipped ? 'Unequip' : 'Equip'}</button>
-                                    ) : (
-                                        <button onClick={() => onUnlock(item)} disabled={resonance < item.cost} className={`w-full py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-1 transition-all ${resonance >= item.cost ? 'bg-yellow-600/20 border border-yellow-500/30 text-yellow-200 hover:bg-yellow-600/30' : 'bg-white/5 border-white/5 text-white/20 cursor-not-allowed'}`}><Zap size={10} /> {item.cost}</button>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
+                {/* Header with Tabs */}
+                <div className="p-4 border-b border-white/5 bg-black/20">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-white/90 font-serif italic text-xl">Spirit Altar</h2>
+                        <button onClick={onClose}><X className="text-white/50 hover:text-white" /></button>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => setTab('items')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${tab === 'items' ? 'bg-white/10 text-white' : 'text-white/40 hover:bg-white/5'}`}>Artifacts</button>
+                        <button onClick={() => setTab('spirit')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${tab === 'spirit' ? 'bg-white/10 text-white' : 'text-white/40 hover:bg-white/5'}`}>Spirit Form</button>
+                    </div>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-6">
+                    {tab === 'items' ? (
+                        // Existing Artifacts Grid
+                        <div className="grid grid-cols-2 gap-4">
+                             {artifacts.map((item: any) => {
+                                 // ... (기존 아티팩트 렌더링 코드 그대로 유지)
+                                 const isOwned = ownedItems.includes(item.id);
+                                 const isEquipped = equippedItems[item.type] === item.id;
+                                 return (
+                                     <div key={item.id} className={`relative p-4 rounded-xl border transition-all flex flex-col gap-2 ${isOwned ? 'bg-white/5 border-white/10' : 'bg-black/40 border-white/5 opacity-60'}`}>
+                                         <div className="flex justify-between items-start"><span className="text-2xl">{item.icon}</span>{isEquipped && <span className="text-[10px] bg-green-500/20 text-green-300 px-1.5 py-0.5 rounded border border-green-500/30">EQUIPPED</span>}</div>
+                                         <div><h3 className="text-white/90 text-sm font-medium">{item.name}</h3><p className="text-white/40 text-[10px] mt-1 line-clamp-2">{item.description}</p></div>
+                                         <div className="mt-auto pt-3">
+                                             {isOwned ? (
+                                                 <button onClick={() => onEquip(item)} className={`w-full py-2 text-xs font-medium rounded-lg border transition-colors ${isEquipped ? 'bg-white/10 border-white/20 text-white' : 'bg-transparent border-white/10 text-white/50 hover:bg-white/5 hover:text-white'}`}>{isEquipped ? 'Unequip' : 'Equip'}</button>
+                                             ) : (
+                                                 <button onClick={() => onUnlock(item)} disabled={resonance < item.cost} className={`w-full py-2 text-xs font-medium rounded-lg flex items-center justify-center gap-1 transition-all ${resonance >= item.cost ? 'bg-yellow-600/20 border border-yellow-500/30 text-yellow-200 hover:bg-yellow-600/30' : 'bg-white/5 border-white/5 text-white/20 cursor-not-allowed'}`}><Zap size={10} /> {item.cost}</button>
+                                             )}
+                                         </div>
+                                     </div>
+                                 );
+                             })}
+                        </div>
+                    ) : (
+                        // [New] Spirit Form Grid
+                        <div className="flex flex-col gap-4">
+                             <div className="text-center mb-4">
+                                 <span className="text-yellow-200 text-xs font-mono border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 rounded-full">Current Resonance: {resonance}</span>
+                             </div>
+                             {SPIRIT_FORMS.map((form: any) => {
+                                 const isUnlocked = resonance >= form.minResonance;
+                                 const isSelected = spiritForm === form.id;
+                                 return (
+                                     <button 
+                                         key={form.id} 
+                                         onClick={() => isUnlocked && changeSpiritForm(form.id)}
+                                         disabled={!isUnlocked}
+                                         className={`relative p-4 rounded-xl border flex items-center gap-4 transition-all text-left ${isSelected ? 'bg-white/10 border-white/30 shadow-[0_0_15px_rgba(255,255,255,0.1)]' : isUnlocked ? 'bg-black/40 border-white/10 hover:bg-white/5' : 'bg-black/60 border-white/5 opacity-50 cursor-not-allowed'}`}
+                                     >
+                                         <div className="w-16 h-16 bg-black/50 rounded-lg flex items-center justify-center overflow-hidden border border-white/5">
+                                             {form.id === 'wisp' && <div className="scale-50"><SpiritWisp /></div>}
+                                             {form.id === 'fox' && <div className="scale-50"><SpiritFox /></div>}
+                                             {form.id === 'guardian' && <span className="text-2xl">🧚</span>}
+                                         </div>
+                                         <div className="flex-1">
+                                             <div className="flex items-center gap-2">
+                                                 <h3 className="text-white/90 font-medium">{form.name}</h3>
+                                                 {!isUnlocked && <Lock size={12} className="text-white/30" />}
+                                             </div>
+                                             <p className="text-white/40 text-xs mt-1">{form.desc}</p>
+                                             <p className="text-yellow-500/50 text-[10px] mt-1 font-mono">Req: {form.minResonance} Res</p>
+                                         </div>
+                                         {isSelected && <div className="w-4 h-4 bg-green-500 rounded-full shadow-[0_0_10px_green]" />}
+                                     </button>
+                                 )
+                             })}
+                        </div>
+                    )}
                 </div>
             </div>
         </ModalOverlay>

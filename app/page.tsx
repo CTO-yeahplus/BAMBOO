@@ -3,17 +3,18 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
-import { Book, X, Star, Share2, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Trees, CloudRain, Flame, Waves, Lock, Sun, Settings2, Volume2, Mic, LogIn, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, Keyboard, SendHorizontal, Palette, Mail, Moon, Bed, Square, PenTool } from 'lucide-react'; // PenTool 추가
-
+import { Book, X, Star, Share2, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Trees, CloudRain, Flame, Waves, Lock, Sun, Settings2, Volume2, Mic, LogIn, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, Keyboard, SendHorizontal, Palette, Mail, Moon, Bed, Square, PenTool, ImageIcon } from 'lucide-react'; // PenTool 추가
+import { MemoryGalleryModal, FullImageViewer } from './components/MemoryGalleryModal';
 import { useBambooEngine } from './hooks/useBambooEngine';
 import { useRipple } from './hooks/useRipple';
-import { Memory, WeatherType, Particle } from './types';
+import { Memory, WeatherType, Particle,THEMES } from './types';
 import { getMoonPhase, getMoonIconPath } from './utils/moonPhase';
 
 // Components
-import { SpiritAura, SpiritAccessory, SpringPetal, SummerFirefly, AutumnLeaf, ConstellationLayer, OrbitLayer, MemoryFlower, GoldenCocoon, FireflyLayer, SoulTree, FloatingBottle } from './components/ForestVisuals';
+import { ForestBackground, SpiritAura, SpiritAccessory, SpringPetal, SummerFirefly, AutumnLeaf, ConstellationLayer, OrbitLayer, MemoryFlower, GoldenCocoon, FireflyLayer, SoulTree, FloatingBottle, SpiritWisp, SpiritFox, SpiritGuardian } from './components/ForestVisuals';
 import { OracleModal, SettingsModal, AltarModal, ProfileModal, BottleWriteModal, BottleReadModal, FireRitualModal } from './components/ForestModals';
 import { MemoryRitual } from './components/MemoryRitual';
+import { TimeCapsuleModal } from './components/TimeCapsuleModal'; // [Check] 경로 확인
 
 // Constants
 const WHISPERS = ["오늘 하루는 어땠어?", "누구에게도 말 못 할 고민이 있니?", "그냥 빗소리만 듣고 싶다면, 그래도 돼.", "무거운 짐은 잠시 여기에 내려놓아.", "바람이 네 이야기를 기다리고 있어.", "괜찮아, 아무 말 안 해도 돼.", "어제보다 오늘 마음은 좀 어때?"];
@@ -36,10 +37,14 @@ export default function BambooForest() {
       resonance,
       // [New] Bottle functions
       sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle,
-      showFireRitual, setShowFireRitual, performFireRitual
+      showFireRitual, setShowFireRitual, performFireRitual, saveVoiceCapsule,
+      spiritForm, SPIRIT_FORMS, changeSpiritForm // [Check] Import
   } = engine;
-
+  const currentThemeConfig = THEMES.find(t => t.id === engine.currentTheme) || THEMES[0];
   const { ripples, addRipple } = useRipple();
+  const [showCapsuleModal, setShowCapsuleModal] = useState(false);
+  // 2. [New] 선택된 이미지 상태 추가
+  const [selectedImage, setSelectedImage] = useState<any>(null); // 타입은 any 혹은 MemoryIllustration
   
   // Local UI States
   const [showMailbox, setShowMailbox] = useState(false);
@@ -88,6 +93,16 @@ export default function BambooForest() {
   const spiritGlow = useTransform(motionValues.springVolume, [0, 1], ["drop-shadow(0 0 10px rgba(255,255,255,0.2))", "drop-shadow(0 0 50px rgba(255,255,210,0.8))"]);
   const spiritGlowOpacity = useTransform(motionValues.springVolume, [0, 1], [0, 0.6]);
 
+  const processedMemories = useMemo(() => {
+    return memories.map((m, i) => {
+        // DB에 저장된 x, y가 있으면 쓰고, 없으면 인덱스(i)를 기반으로 계산하여 부여
+        // (Math.random을 쓰면 렌더링 때마다 위치가 바뀌어 깜빡거리므로, 수식을 사용해 위치 고정)
+        const x = (m as any).x ?? ((i * 37) % 80 + 10); // 화면 가로 10% ~ 90% 사이
+        const y = (m as any).y ?? ((i * 53) % 80 + 10); // 화면 세로 10% ~ 90% 사이
+        return { ...m, x, y };
+    });
+  }, [memories]);
+
   useEffect(() => {
       const newParticles = Array.from({ length: 100 }).map((_, i) => ({ id: i, x: Math.random() * 100, y: Math.random() * 100, size: Math.random() * 3 + 1, duration: Math.random() * 5 + 2, delay: Math.random() * 2 }));
       setParticles(newParticles);
@@ -97,7 +112,35 @@ export default function BambooForest() {
 
   return (
     <main className="relative flex flex-col items-center justify-center w-full h-screen overflow-hidden bg-black touch-none" onMouseMove={(e) => {}} onPointerDown={handleGlobalClick}>
-        
+      {/* [Critical Fix] ID 직통 케이블 연결 */}
+      <div style={{ display: 'none' }}>
+            <audio 
+                id="spirit-audio-clear" // 👈 [중요] ID 추가
+                ref={(el) => { if (el) engine.audioRefs.current['clear'] = el; }} 
+                src="/sounds/forest_ambience.mp3" 
+                loop playsInline 
+            />
+            <audio 
+                id="spirit-audio-rain" // 👈 ID 추가
+                ref={(el) => { if (el) engine.audioRefs.current['rain'] = el; }} 
+                src="/sounds/rain.mp3" 
+                loop playsInline 
+            />
+            <audio 
+                id="spirit-audio-snow" // 👈 ID 추가
+                ref={(el) => { if (el) engine.audioRefs.current['snow'] = el; }} 
+                src="/sounds/wind.mp3" 
+                loop playsInline 
+            />
+            <audio 
+                id="spirit-audio-ember" // 👈 ID 추가
+                ref={(el) => { if (el) engine.audioRefs.current['ember'] = el; }} 
+                src="/sounds/fire.mp3" 
+                loop playsInline 
+            />
+        </div>
+        {/* 기존의 Background Image/Video 태그들을 ForestBackground 안으로 넣거나 대체 */}
+        <ForestBackground themeId={engine.currentTheme} themeConfig={currentThemeConfig}>
         {/* 1. Intro Overlay */}
         <AnimatePresence>
             {engine.isMounted && introVisible && (
@@ -152,14 +195,47 @@ export default function BambooForest() {
             {/* Spirit & Tree Container */}
             <motion.div className={`absolute inset-0 flex items-center justify-center ${!hasWoken ? 'cursor-pointer z-30' : 'z-30'}`} style={{ x: spiritX, y: spiritY }}>
                 <SoulTree resonance={resonance} memories={memories} />
-                <motion.div className="relative z-10 w-[280px] h-[380px] md:w-[400px] md:h-[550px] rounded-[40px] overflow-hidden transition-all duration-300" style={{ scale: engine.isBreathing || engine.isHolding ? 1 : spiritScale, filter: spiritGlow as any }} animate={isSilentMode ? { scale: 1.15, y: 20 } : !hasWoken ? { scale: 0.95, y: [0, 5, 0] } : { scale: 1.05, y: 0 }} transition={{ duration: 4, ease: "easeInOut" }} onClick={handleSpiritClick} onPan={(e, info) => { if(hasWoken) engine.handlePet(); }} onPointerDown={() => engine.setIsHolding(true)} onPointerUp={() => engine.setIsHolding(false)}>
-                    <SpiritAura type={engine.equippedItems.aura} />
-                    <Image src="/images/spirit_final.png" alt="Spirit" fill className="object-cover" />
-                    <SpiritAccessory type={engine.equippedItems.head} />
-                    <motion.div className="absolute inset-0 bg-white mix-blend-overlay z-30" style={{ opacity: spiritGlowOpacity as any }} />
-                    <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-white/5 to-white/10 mix-blend-overlay" />
+                {/* [Modified] Spirit Rendering Logic */}
+                <motion.div 
+                    className="relative z-10 w-[280px] h-[380px] md:w-[400px] md:h-[550px] flex items-center justify-center transition-all duration-300" 
+                    style={{ scale: engine.isBreathing || engine.isHolding ? 1 : spiritScale, filter: spiritGlow as any }} 
+                    animate={isSilentMode ? { scale: 1.15, y: 20 } : !hasWoken ? { scale: 0.95, y: [0, 5, 0] } : { scale: 1.05, y: 0 }} 
+                    transition={{ duration: 4, ease: "easeInOut" }} 
+                    onClick={handleSpiritClick} 
+                    onPan={(e, info) => { if(hasWoken) engine.handlePet(); }} 
+                    onPointerDown={() => engine.setIsHolding(true)} 
+                    onPointerUp={() => engine.setIsHolding(false)}
+                >
+                    {/* 1. Level 1: Wisp */}
+                    {spiritForm === 'wisp' && (
+                        <div className="scale-150 cursor-pointer">
+                            <SpiritWisp />
+                        </div>
+                    )}
+
+                    {/* 2. Level 2: Fox */}
+                    {spiritForm === 'fox' && (
+                        <div className="scale-125 cursor-pointer">
+                            <SpiritFox />
+                        </div>
+                    )}
+
+                    {/* 3. Level 3: Guardian */}
+                    {spiritForm === 'guardian' && (
+                        // 기존 이미지 태그를 새 컴포넌트로 교체
+                        <SpiritGuardian 
+                            resonance={motionValues.springVolume} // 또는 실제 soul.resonance 값 사용
+                            isBreathing={engine.isBreathing}
+                            isHolding={engine.isHolding}
+                            spiritGlowOpacity={spiritGlowOpacity}
+                            equippedItems={engine.equippedItems}
+                        />
+                    )}
+
+                    {/* Common Overlays (Text) */}
                     {!hasWoken && <div className="absolute inset-0 flex flex-col items-center justify-center z-50"><motion.div initial={{ opacity: 0 }} animate={{ opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 3, repeat: Infinity }} className="flex flex-col items-center gap-4"><MousePointerClick className="text-white/50 w-12 h-12" /><p className="text-white/60 font-light text-sm tracking-[0.2em] uppercase">Touch to awaken</p></motion.div></div>}
                     {engine.isBreathing && <div className="absolute inset-0 flex items-center justify-center z-50"><motion.p className="text-white/90 font-light text-xl tracking-[0.4em] uppercase drop-shadow-lg" animate={{ opacity: [0, 1, 1, 0], scale: [0.9, 1.1, 1.1, 0.9] }} transition={{ duration: 19, times: [0, 0.2, 0.8, 1], repeat: Infinity }}>Breathe</motion.p></div>}
+                
                 </motion.div>
             </motion.div>
         </motion.div>
@@ -255,6 +331,24 @@ export default function BambooForest() {
                     </div>
                 </motion.button>
 
+                {/* 3. 모래시계 버튼 연결 (Expanded Top Right Controls 내부) */}
+                {isPremium && (
+                    <motion.button 
+                        initial={{ opacity: 0, scale: 0 }} 
+                        animate={{ opacity: 1, scale: 1 }} 
+                        whileHover={{ scale: 1.1 }} 
+                        whileTap={{ scale: 0.9 }} 
+                        className="group cursor-pointer flex flex-col items-center gap-2" 
+                        // [Fix] alert 대신 모달 열기로 변경
+                        onClick={() => setShowCapsuleModal(true)}
+                    >
+                        <div className="relative flex items-center justify-center w-12 h-12 bg-black/40 backdrop-blur-md rounded-full border border-yellow-500/30 shadow-[0_0_20px_rgba(234,179,8,0.2)] group-hover:bg-yellow-500/10 transition-colors">
+                            <Hourglass className="text-yellow-200" size={18} />
+                            <div className="absolute inset-0 bg-yellow-400 rounded-full opacity-10 animate-pulse" />
+                        </div>
+                    </motion.button>
+                )}
+
                 {!engine.hasCollectedDew && (
                     <motion.button 
                         initial={{ opacity: 0, scale: 0 }} 
@@ -282,23 +376,91 @@ export default function BambooForest() {
                 >
                     <span className="text-lg font-bold">{getUserInitial()}</span>
                 </motion.button>
+
+                {/* 5. [New] Memory Gallery Button (앨범 버튼 추가) */}
+                <motion.button 
+                    initial={{ opacity: 0, scale: 0 }} 
+                    animate={{ opacity: 1, scale: 1 }} 
+                    whileHover={{ scale: 1.1 }} 
+                    whileTap={{ scale: 0.9 }} 
+                    className="group cursor-pointer flex flex-col items-center gap-2" 
+                    onClick={() => engine.setShowGalleryModal(true)}
+                >
+                    <div className="relative flex items-center justify-center w-12 h-12 bg-black/40 backdrop-blur-md rounded-full border border-purple-500/30 shadow-[0_0_20px_rgba(168,85,247,0.2)] group-hover:bg-purple-500/10 transition-colors">
+                        <ImageIcon className="text-purple-200" size={18} />
+                    </div>
+                </motion.button>
             </div>
         )}
       </AnimatePresence>
 
+      </ForestBackground>
+
         {/* MODALS */}
         <OracleModal isOpen={engine.showOracleModal} card={engine.todaysCard} onConfirm={engine.confirmOracle} />
-        <SettingsModal isOpen={engine.showSettings} onClose={() => engine.setShowSettings(false)} bgVolume={bgVolume} setBgVolume={engine.setBgVolume} voiceVolume={voiceVolume} setVoiceVolume={engine.setVoiceVolume} />
-        <AltarModal isOpen={engine.showAltar} onClose={() => engine.setShowAltar(false)} resonance={engine.resonance} artifacts={engine.ARTIFACTS} ownedItems={engine.ownedItems} equippedItems={engine.equippedItems} onUnlock={engine.unlockArtifact} onEquip={engine.equipArtifact} />
+        <SettingsModal isOpen={engine.showSettings} onClose={() => engine.setShowSettings(false)} bgVolume={bgVolume} setBgVolume={engine.setBgVolume} voiceVolume={voiceVolume} setVoiceVolume={engine.setVoiceVolume}
+        currentTheme={engine.currentTheme}
+        setTheme={engine.setTheme}
+        isPremium={isPremium} />
+        <AltarModal 
+            isOpen={engine.showAltar} 
+            onClose={() => engine.setShowAltar(false)} 
+            resonance={engine.resonance} 
+            artifacts={engine.ARTIFACTS} 
+            ownedItems={engine.ownedItems} 
+            equippedItems={engine.equippedItems} 
+            onUnlock={engine.unlockArtifact} 
+            onEquip={engine.equipArtifact}
+            // [New Props]
+            spiritForm={spiritForm}
+            changeSpiritForm={changeSpiritForm}
+        />
         <ProfileModal isOpen={showProfile} onClose={() => setShowProfile(false)} user={user} isPremium={isPremium} signOut={engine.signOut} getUserInitial={getUserInitial} />
-        
+
         {/* [New] Bottle Modals */}
         <BottleWriteModal isOpen={showWriteBottle} onClose={() => setShowWriteBottle(false)} onSend={sendBottle} />
         <BottleReadModal bottle={foundBottle} onClose={() => setFoundBottle(null)} onLike={likeBottle} />
 
         {/* Memory Ritual */}
         <MemoryRitual isOpen={engine.showMemoryRitual} onClose={() => engine.setShowMemoryRitual(false)} user={user} isPremium={isPremium} onFinalize={engine.finalizeMemory} onSaveCapsule={engine.saveVoiceCapsule} />
+        
+        <SettingsModal 
+            isOpen={engine.showSettings} 
+            onClose={() => engine.setShowSettings(false)} 
+            
+            // 1. 기존 오디오 볼륨 (이건 아마 있을 겁니다)
+            bgVolume={engine.bgVolume} 
+            setBgVolume={engine.setBgVolume} 
+            voiceVolume={engine.voiceVolume} 
+            setVoiceVolume={engine.setVoiceVolume}
+            
+            // 2. [Check] 믹서 & 프리셋 데이터 (여기가 비어있으면 안 됩니다!)
+            // 아래 5줄이 꼭 포함되어야 프리셋과 슬라이더가 작동합니다.
+            isMixerMode={engine.isMixerMode}
+            setIsMixerMode={engine.setIsMixerMode}
+            mixerVolumes={engine.mixerVolumes}   // <--- 이게 없어서 값이 안 보였던 것
+            setMixerVolumes={engine.setMixerVolumes}
+            applyPreset={engine.applyPreset}     // <--- 이게 없어서 프리셋 버튼이 작동 안 한 것
 
+            // 3. 테마 관련 (이것도 확인)
+            currentTheme={engine.currentTheme}
+            setTheme={engine.setTheme}
+            isPremium={isPremium}
+        />
+
+        {/* [Modified] 앨범 모달: onSelect 추가 */}
+        <MemoryGalleryModal 
+            isOpen={engine.showGalleryModal} 
+            onClose={() => engine.setShowGalleryModal(false)} 
+            currentResonance={engine.resonance}
+            onSelect={(img) => setSelectedImage(img)} // 이미지를 선택하면 상태 업데이트
+        />
+
+        {/* [New] 전체 화면 뷰어: 최상단 배치 */}
+        <FullImageViewer 
+            image={selectedImage}
+            onClose={() => setSelectedImage(null)}
+        />
         {/* Mailbox */}
         <AnimatePresence>
             {showMailbox && (
@@ -330,6 +492,12 @@ export default function BambooForest() {
         {/* [New] Fire Ritual Modal */}
         <FireRitualModal isOpen={showFireRitual} onClose={() => setShowFireRitual(false)} onBurn={performFireRitual} />
 
+        {/* 4. 모달 렌더링 (하단 Modals 영역에 추가) */}
+        <TimeCapsuleModal 
+            isOpen={showCapsuleModal} 
+            onClose={() => setShowCapsuleModal(false)} 
+            onSave={engine.saveVoiceCapsule} 
+        />
         {/* Journal Layer */}
         <AnimatePresence>
           {engine.showJournal && (
@@ -337,10 +505,16 @@ export default function BambooForest() {
               <div className="absolute top-8 right-20 z-50 flex gap-2"><button onClick={() => { engine.triggerLight(); setViewMode(viewMode === 'stars' ? 'orbit' : 'stars'); }} className="p-3 bg-white/10 rounded-full hover:bg-white/20 text-white/70 transition-all flex items-center gap-2 border border-white/5">{viewMode === 'stars' ? <LayoutGrid size={20} /> : <Star size={20} />}<span className="text-[10px] uppercase tracking-widest hidden md:block">{viewMode === 'stars' ? 'Orbit View' : 'Star View'}</span></button></div>
               {viewMode === 'stars' ? (
                   <>
-                    <ConstellationLayer memories={memories} />
-                    {memories.map((item, index) => {
+                    {/* [Fix] memories -> processedMemories 로 변경 */}
+                    <ConstellationLayer memories={processedMemories} />
+                    
+                    {/* [Fix] memories -> processedMemories 로 변경 */}
+                    {processedMemories.map((item, index) => {
                       const memory = item as Memory & { x: number; y: number; unlock_date?: string };
-                      if (typeof memory.x !== 'number' || typeof memory.y !== 'number') return null;
+                      
+                      // [Deleted] 좌표 체크 코드를 삭제했습니다. (위에서 자동으로 만들어주므로)
+                      // if (typeof memory.x !== 'number' || typeof memory.y !== 'number') return null; 
+
                       const isTimeCapsule = !!memory.unlock_date; 
                       const isLocked = isTimeCapsule && new Date(memory.unlock_date!) > new Date(); 
                       return (
@@ -351,8 +525,10 @@ export default function BambooForest() {
                     })}
                   </>
               ) : (
+                  // Orbit View는 기존 memories를 그대로 사용해도 무관합니다 (날짜 기반이라 좌표 불필요)
                   <OrbitLayer memories={memories} onSelect={(m) => { engine.playMagicDust(); engine.triggerLight(); setSelectedMemory(m); }} />
               )}
+
               <AnimatePresence>
                 {selectedMemory && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">

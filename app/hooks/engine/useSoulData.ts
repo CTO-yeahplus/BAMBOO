@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Memory, Artifact, ARTIFACTS, ArtifactType, ORACLE_DECK, OracleCard, WhisperBottle } from '../../types';
+import { SpiritFormType, SPIRIT_FORMS } from '../../types'; // Import 추가
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,6 +27,9 @@ export function useSoulData(user: any, triggerSuccess: () => void) {
       head: null 
   });
   const [soulLevel, setSoulLevel] = useState(1);
+  // [New] Spirit Form State
+  const [spiritForm, setSpiritForm] = useState<SpiritFormType>('wisp');
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
 
   // Oracle State
   const [todaysCard, setTodaysCard] = useState<OracleCard | null>(null);
@@ -143,6 +147,32 @@ export function useSoulData(user: any, triggerSuccess: () => void) {
   const generateMonthlyLetter = async () => { if (!user) return; const today = new Date(); const monthStr = `${today.getFullYear()}-${today.getMonth() + 1}`; const existing = letters.find(l => l.month === monthStr); if (existing) return; try { await fetch('/api/soul-letter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, month: monthStr }) }); fetchLetters(); triggerSuccess(); } catch (e) { console.error(e); } };
   const saveVoiceCapsule = async (audioBlob: Blob, summary: string, unlockDate: string) => { if (!user) return; try { const fileName = `${user.id}/${Date.now()}.webm`; const { error: uploadError } = await supabase.storage.from('capsules').upload(fileName, audioBlob); if (uploadError) throw uploadError; const { data: { publicUrl } } = supabase.storage.from('capsules').getPublicUrl(fileName); const { error: dbError } = await supabase.from('memories').insert({ user_id: user.id, summary: summary || "Voice from the past", emotion: 'neutral', audio_url: publicUrl, is_capsule: true, unlock_date: unlockDate }); if (dbError) throw dbError; triggerSuccess(); fetchMemories(); } catch (error) { console.error("Capsule Save Failed:", error); alert("캡슐을 묻는 도중 문제가 발생했습니다."); } };
 
+  // [New] Resonance 변경 시 자동 진화 로직 (원하면 활성화, 지금은 수동 변경만)
+  useEffect(() => {
+    // 초기 로드 시 resonance에 맞춰서 자동 설정 (사용자 설정이 없을 경우)
+    if (resonance >= 300 && spiritForm === 'wisp') setSpiritForm('guardian');
+    else if (resonance >= 100 && resonance < 300 && spiritForm === 'wisp') setSpiritForm('fox');
+    }, [resonance]); // *주의: 너무 자주 바뀌지 않게 로직 조절 필요. 여기서는 심플하게 둠.
+
+    // [New] Change Form Function
+    const changeSpiritForm = (form: SpiritFormType) => {
+        const target = SPIRIT_FORMS.find(f => f.id === form);
+        if (target && resonance >= target.minResonance) {
+            setSpiritForm(form);
+            triggerSuccess();
+            // Save to local storage or DB if needed
+            localStorage.setItem('spirit_form', form);
+        } else {
+            alert("아직 영혼의 공명이 부족합니다.");
+        }
+    };
+
+    // Load saved form on mount
+    useEffect(() => {
+        const savedForm = localStorage.getItem('spirit_form') as SpiritFormType;
+        if (savedForm) setSpiritForm(savedForm);
+    }, []);
+
   return { 
       memories, fetchMemories, 
       letters, generateMonthlyLetter, 
@@ -152,6 +182,7 @@ export function useSoulData(user: any, triggerSuccess: () => void) {
       soulLevel, ARTIFACTS,
       saveVoiceCapsule,
       todaysCard, showOracleModal, confirmOracle,
-      sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle
+      sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle,
+      spiritForm, changeSpiritForm, SPIRIT_FORMS,showGalleryModal, setShowGalleryModal,
   };
 }
