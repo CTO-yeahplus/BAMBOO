@@ -13,32 +13,26 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// [Design] 뷰포트 설정: 사용자가 숲을 손으로 만지작거려도(Zoom) 깨지지 않게 고정합니다.
+// [New] PWA Viewport Setting (확대 방지 & 전체화면 최적화)
 export const viewport: Viewport = {
+  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false,
-  themeColor: "#000000",
-  viewportFit: "cover", // 노치(Notch) 영역까지 숲을 확장합니다.
+  userScalable: false, // 터치 실수로 확대되는 것 방지
 };
 
-// [Design] 메타데이터: 홈 화면에 추가되었을 때 '앱'처럼 보이게 합니다.
 export const metadata: Metadata = {
   title: "Bamboo Forest",
-  description: "A shelter for your soul.",
-  manifest: "/manifest.json",
+  description: "Listen to your soul.",
+  manifest: "/manifest.json", // [New] 매니페스트 연결
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent", // 상단 상태바를 숲과 하나되게 투명하게 만듭니다.
-    title: "Forest",
+    statusBarStyle: "black-translucent",
+    title: "Bamboo Forest",
   },
   formatDetection: {
-    telephone: false, // 전화번호 자동 링크 방지 (몰입 방해 요소 제거)
-  },
-  icons: {
-    icon: "/images/spirit_final.png",
-    apple: "/images/spirit_final.png", // 아이폰 홈 화면 아이콘
+    telephone: false,
   },
 };
 
@@ -48,10 +42,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
-      <body className="antialiased bg-black text-white overflow-hidden select-none overscroll-none">
-        {children}
-      </body>
+    <html lang="en">
+      <body>{children}</body>
     </html>
   );
 }

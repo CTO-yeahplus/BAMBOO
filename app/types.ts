@@ -29,18 +29,27 @@ export interface Memory {
 export interface OracleCard {
     id: string;
     message: string;
-    keyword: string;
+    name: string;
     icon: string; 
 }
 
+// [New] Whisper Bottle Definition
+export interface WhisperBottle {
+  id: number;
+  content: string;
+  likes: number;
+  created_at: string;
+  // user_id는 프론트엔드에서 굳이 노출할 필요 없음 (익명성)
+}
+
 export const ORACLE_DECK: OracleCard[] = [
-    { id: '1', keyword: '쉼', message: "가끔은 멈춰 서야 비로소 보이는 것들이 있어.", icon: "Coffee" },
-    { id: '2', keyword: '용기', message: "네가 내딛는 그 작은 한 걸음이 곧 길이야.", icon: "Footprints" },
-    { id: '3', keyword: '위로', message: "괜찮아, 그림자가 있다는 건 빛이 있다는 증거니까.", icon: "Sun" },
-    { id: '4', keyword: '기억', message: "가장 행복했던 순간을 떠올려볼까?", icon: "Sparkles" },
-    { id: '5', keyword: '놓아줌', message: "꽉 쥔 손을 펴야 새로운 것을 잡을 수 있어.", icon: "Wind" },
-    { id: '6', keyword: '시작', message: "늦지 않았어. 바로 지금이 가장 빠른 때야.", icon: "Sunrise" },
-    { id: '7', keyword: '자존감', message: "너는 존재만으로도 충분히 사랑받을 가치가 있어.", icon: "Heart" },
+    { id: '1', name: '쉼', message: "가끔은 멈춰 서야 비로소 보이는 것들이 있어.", icon: "Coffee" },
+    { id: '2', name: '용기', message: "네가 내딛는 그 작은 한 걸음이 곧 길이야.", icon: "Footprints" },
+    { id: '3', name: '위로', message: "괜찮아, 그림자가 있다는 건 빛이 있다는 증거니까.", icon: "Sun" },
+    { id: '4', name: '기억', message: "가장 행복했던 순간을 떠올려볼까?", icon: "Sparkles" },
+    { id: '5', name: '놓아줌', message: "꽉 쥔 손을 펴야 새로운 것을 잡을 수 있어.", icon: "Wind" },
+    { id: '6', name: '시작', message: "늦지 않았어. 바로 지금이 가장 빠른 때야.", icon: "Sunrise" },
+    { id: '7', name: '자존감', message: "너는 존재만으로도 충분히 사랑받을 가치가 있어.", icon: "Heart" },
 ];
 
 export const TIME_THEMES = {
@@ -68,6 +77,15 @@ export interface Artifact {
     description: string;
     cost: number;
     icon: string;
+}
+
+// [New] Firefly User Type (Realtime Presence)
+export interface FireflyUser {
+  id: string; // Session ID or User ID
+  x: number;  // 0~100%
+  y: number;  // 0~100%
+  color: string; // Hex color
+  last_active: number; // Timestamp
 }
 
 export const ARTIFACTS: Artifact[] = [

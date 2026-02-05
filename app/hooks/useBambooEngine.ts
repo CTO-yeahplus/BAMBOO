@@ -23,19 +23,16 @@ export function useBambooEngine() {
   const { playPaperRustle, playMagicDust, playWindChime, playWaterDrop, initAudio, playIntroBoom } = useSoundEngine();
   
   const soul = useSoulData(user, triggerSuccess);
+  const [showFireRitual, setShowFireRitual] = useState(false);
   
-  // State definitions (Moved up for closure access)
   const [weather, setWeather] = useState<WeatherType>('clear');
   const [selectedAmbience, setSelectedAmbience] = useState<WeatherType | null>(null);
 
-  // [New] 감정 감지 핸들러
-  // Vapi가 감정을 감지하면 이 함수가 호출되어 날씨를 자동으로 바꿉니다.
   const handleEmotionDetected = useCallback((detectedWeather: WeatherType) => {
-      // 현재 날씨와 다를 때만 변경 (불필요한 리렌더링 방지)
       setWeather((prev) => {
           if (prev !== detectedWeather) {
-              triggerMedium(); // 햅틱 피드백으로 "숲이 반응했음"을 알림
-              setSelectedAmbience(detectedWeather); // UI 버튼 상태도 동기화
+              triggerMedium();
+              setSelectedAmbience(detectedWeather);
               return detectedWeather;
           }
           return prev;
@@ -43,11 +40,10 @@ export function useBambooEngine() {
   }, [triggerMedium]);
 
   const handleCallEnd = useCallback(() => {
-      triggerLight();
-      soul.fetchMemories();
+    triggerLight();
+    soul.fetchMemories();
   }, [triggerLight, soul]);
 
-  // [Check] handleEmotionDetected를 useSpiritVapi에 전달
   const voice = useSpiritVapi(user?.id ?? null, handleCallEnd, handleEmotionDetected);
 
   const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({ clear: null, rain: null, snow: null, ember: null });
@@ -98,6 +94,28 @@ export function useBambooEngine() {
   const [bgVolume, setBgVolume] = useState(0.5);
   const [voiceVolume, setVoiceVolume] = useState(1.0);
 
+  // [New] Mobile Audio Warm-up
+  const startExperience = useCallback(() => {
+      setHasStarted(true);
+      Object.values(audioRefs.current).forEach(audio => {
+          if (audio) {
+              audio.muted = true;
+              const playPromise = audio.play();
+              if (playPromise !== undefined) {
+                  playPromise.then(() => {
+                      audio.pause();
+                      audio.muted = false;
+                  }).catch(error => {
+                      console.log("Audio warm-up blocked:", error);
+                  });
+              }
+          }
+      });
+      initAudio(); 
+  }, [initAudio]);
+
+  const [hasStarted, setHasStarted] = useState(false);
+
   const collectDew = useCallback(() => {
       triggerMedium();
       playWaterDrop();
@@ -108,12 +126,6 @@ export function useBambooEngine() {
       setHasCollectedDew(true);
       setTimeout(() => setDailyQuote(null), 5000);
   }, [playWaterDrop, triggerMedium, soul]);
-
-  const [hasStarted, setHasStarted] = useState(false);
-  const startExperience = useCallback(() => {
-      setHasStarted(true);
-      initAudio(); 
-  }, [initAudio]);
 
   const wakeSpirit = () => {
       triggerSuccess();
@@ -139,7 +151,6 @@ export function useBambooEngine() {
       if (showTutorial) setShowTutorial(false);
   };
 
-  // [Manual Override] 사용자가 버튼을 누르면 강제로 날씨 변경
   const changeAmbience = (type: WeatherType) => {
       triggerLight();
       setSelectedAmbience(type);
@@ -153,7 +164,6 @@ export function useBambooEngine() {
       }
   }, [isHolding, triggerLight, playMagicDust]);
 
-  // Sleep Timer Logic
   const startSleepTimer = useCallback((minutes: number) => {
       triggerSuccess();
       const seconds = minutes * 60;
@@ -179,7 +189,6 @@ export function useBambooEngine() {
       return () => clearInterval(interval);
   }, [sleepTimer, stopSleepTimer]);
 
-  // Audio Fading Logic
   const fadeToVolume = useCallback((type: WeatherType, targetVol: number, duration: number = 1000) => {
     const audio = audioRefs.current[type];
     if (!audio) return;
@@ -214,8 +223,6 @@ export function useBambooEngine() {
         sleepMultiplier = Math.max(0, sleepTimer / initialSleepTime);
     }
     const effectiveBgVolume = bgVolume * sleepMultiplier;
-
-    // selectedAmbience가 있으면 그것을, 없으면 자동 감지된 weather를 사용
     const targetKey = selectedAmbience || weather;
     
     Object.keys(audioRefs.current).forEach((key) => {
@@ -299,6 +306,34 @@ export function useBambooEngine() {
     }
   }, [voice.callStatus]);
 
+  // [Fix] Import from usePresence
+  const { fireflies, broadcastTouch } = require('./usePresence').usePresence(user?.id ?? null);
+
+  // [New] Burn Logic
+  const performFireRitual = useCallback(() => {
+    // 1. 강한 햅틱
+    triggerSuccess(); 
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+         navigator.vibrate([100, 50, 200, 50, 500]); // 웅~ 웅~ 콰광
+    }
+
+    // 2. 불 소리 재생 (Audio Refs 사용)
+    const fireAudio = audioRefs.current['ember'];
+    if (fireAudio) {
+        fireAudio.volume = 1.0;
+        fireAudio.currentTime = 0;
+        fireAudio.play();
+        // 4초 뒤 페이드 아웃
+        setTimeout(() => {
+           fadeToVolume('ember', selectedAmbience === 'ember' ? bgVolume : 0, 2000);
+        }, 4000);
+    }
+
+    // 3. 보상 (정화의 의미로 공명도 소폭 상승)
+    soul.addResonance(20);
+    
+    }, [triggerSuccess, audioRefs, fadeToVolume, selectedAmbience, bgVolume, soul]);
+
   return {
       user, isPremium, signInWithGoogle, signOut, isMounted: true, 
       hasStarted, startExperience,
@@ -315,5 +350,13 @@ export function useBambooEngine() {
       letters: soul.letters, generateMonthlyLetter: soul.generateMonthlyLetter, saveVoiceCapsule: soul.saveVoiceCapsule,
       sleepTimer, startSleepTimer, stopSleepTimer, playIntroBoom,
       todaysCard: soul.todaysCard, showOracleModal: soul.showOracleModal, confirmOracle: soul.confirmOracle,
+      fireflies, broadcastTouch,
+      // [Fix] Export Bottle Functions
+      sendBottle: soul.sendBottle, 
+      findRandomBottle: soul.findRandomBottle, 
+      likeBottle: soul.likeBottle, 
+      foundBottle: soul.foundBottle, 
+      setFoundBottle: soul.setFoundBottle,
+      showFireRitual, setShowFireRitual, performFireRitual 
   };
 }

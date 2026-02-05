@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
-import { Book, X, Star, Share2, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Trees, CloudRain, Flame, Waves, Lock, Sun, Settings2, Volume2, Mic, LogIn, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, Keyboard, SendHorizontal, Palette, Mail, Moon, Bed, Square } from 'lucide-react';
+import { Book, X, Star, Share2, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Trees, CloudRain, Flame, Waves, Lock, Sun, Settings2, Volume2, Mic, LogIn, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, Keyboard, SendHorizontal, Palette, Mail, Moon, Bed, Square, PenTool } from 'lucide-react'; // PenTool 추가
 
 import { useBambooEngine } from './hooks/useBambooEngine';
 import { useRipple } from './hooks/useRipple';
@@ -11,8 +11,8 @@ import { Memory, WeatherType, Particle } from './types';
 import { getMoonPhase, getMoonIconPath } from './utils/moonPhase';
 
 // Components
-import { SpiritAura, SpiritAccessory, SpringPetal, SummerFirefly, AutumnLeaf, ConstellationLayer, OrbitLayer, MemoryFlower, GoldenCocoon } from './components/ForestVisuals';
-import { OracleModal, SettingsModal, AltarModal, ProfileModal } from './components/ForestModals';
+import { SpiritAura, SpiritAccessory, SpringPetal, SummerFirefly, AutumnLeaf, ConstellationLayer, OrbitLayer, MemoryFlower, GoldenCocoon, FireflyLayer, SoulTree, FloatingBottle } from './components/ForestVisuals';
+import { OracleModal, SettingsModal, AltarModal, ProfileModal, BottleWriteModal, BottleReadModal, FireRitualModal } from './components/ForestModals';
 import { MemoryRitual } from './components/MemoryRitual';
 
 // Constants
@@ -28,17 +28,22 @@ const AMBIENT_SOUNDS: { id: string, name: string, icon: any, type: WeatherType }
 export default function BambooForest() {
   const engine = useBambooEngine();
   
-  // [Fix] Destructuring Variables properly (Fixed ReferenceError: bgVolume, user etc)
   const { 
       user, isPremium, memories, 
       bgVolume, voiceVolume, 
-      motionValues, hasWoken, callStatus, isSilentMode 
+      motionValues, hasWoken, callStatus, isSilentMode,
+      fireflies, broadcastTouch,
+      resonance,
+      // [New] Bottle functions
+      sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle,
+      showFireRitual, setShowFireRitual, performFireRitual
   } = engine;
 
   const { ripples, addRipple } = useRipple();
   
   // Local UI States
   const [showMailbox, setShowMailbox] = useState(false);
+  const [showWriteBottle, setShowWriteBottle] = useState(false); // [New]
   const [selectedLetter, setSelectedLetter] = useState<any>(null);
   const [showSleepMenu, setShowSleepMenu] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -59,10 +64,11 @@ export default function BambooForest() {
 
   const handleSendMessage = () => { if (inputText.trim()) { engine.sendTextMessage(inputText); setInputText(""); } };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } else { engine.playPaperRustle(); } };
-  const handleGlobalClick = (e: React.PointerEvent) => { addRipple(e); };
+  const handleGlobalClick = (e: React.PointerEvent) => { 
+      addRipple(e);
+      broadcastTouch(e.clientX, e.clientY);
+  };
   const handleSpiritClick = () => { if (!hasWoken) engine.wakeSpirit(); };
-  
-  // [Fix] Defined getUserInitial properly
   const getUserInitial = () => { if (user?.email) return user.email[0].toUpperCase(); return "U"; };
   const avatarBorderClass = isPremium ? "border-yellow-400/50 shadow-[0_0_15px_rgba(253,224,71,0.3)]" : "border-white/20";
 
@@ -108,10 +114,10 @@ export default function BambooForest() {
         </AnimatePresence>
 
         {/* Audio */}
-        <audio ref={(el) => { engine.audioRefs.current.clear = el; }} src="/sounds/forest_ambience.mp3" loop />
-        <audio ref={(el) => { engine.audioRefs.current.rain = el; }} src="/sounds/rain.mp3" loop />
-        <audio ref={(el) => { engine.audioRefs.current.snow = el; }} src="/sounds/wind.mp3" loop />
-        <audio ref={(el) => { engine.audioRefs.current.ember = el; }} src="/sounds/fire.mp3" loop />
+        <audio ref={(el) => { engine.audioRefs.current.clear = el; }} src="/sounds/forest_ambience.mp3" loop playsInline />
+        <audio ref={(el) => { engine.audioRefs.current.rain = el; }} src="/sounds/rain.mp3" loop playsInline />
+        <audio ref={(el) => { engine.audioRefs.current.snow = el; }} src="/sounds/wind.mp3" loop playsInline />
+        <audio ref={(el) => { engine.audioRefs.current.ember = el; }} src="/sounds/fire.mp3" loop playsInline />
 
         {/* Background & Particles */}
         <motion.div className="absolute inset-0 w-full h-full" animate={{ opacity: 1 }} transition={{ duration: 2 }}>
@@ -126,6 +132,13 @@ export default function BambooForest() {
                 {engine.isDaytime ? ( <div className="relative w-32 h-32 opacity-90"><div className="absolute inset-0 bg-orange-200/30 blur-[60px] rounded-full" /></div> ) : ( <div className="relative w-32 h-32 opacity-80"><svg viewBox="0 0 24 24" className="w-full h-full text-yellow-100 blur-[0.5px] drop-shadow-[0_0_15px_rgba(255,255,200,0.5)]"><path d={moonPath} fill="currentColor" /></svg><div className="absolute inset-0 bg-yellow-100/20 blur-[50px] rounded-full" /></div> )}
             </motion.div>
             
+            <FireflyLayer fireflies={fireflies} />
+
+            {/* [New] Floating Bottle Layer (랜덤 출현 또는 항상 하나 떠다님) */}
+            {hasWoken && !engine.showJournal && (
+                <FloatingBottle onClick={() => { engine.playPaperRustle(); findRandomBottle(); }} />
+            )}
+
             <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden"><AnimatePresence>{ripples.map((ripple) => (<motion.div key={ripple.id} initial={{ scale: 0, opacity: 0.5 }} animate={{ scale: 4, opacity: 0 }} exit={{ opacity: 0 }} transition={{ duration: 1 }} className="absolute border border-white/30 rounded-full bg-white/5 backdrop-blur-[1px]" style={{ left: ripple.x, top: ripple.y, width: 100, height: 100, x: "-50%", y: "-50%" }} />))}</AnimatePresence></div>
 
             <motion.div className="absolute inset-[-5%] w-[110%] h-[110%] pointer-events-none" style={{ x: particleX, y: particleY }}>
@@ -136,9 +149,10 @@ export default function BambooForest() {
                 })}
             </motion.div>
 
-            {/* Spirit */}
-            <motion.div className={`absolute inset-0 flex items-center justify-center ${!hasWoken ? 'cursor-pointer z-30' : 'z-30'}`} style={{ x: spiritX, y: spiritY }} onClick={handleSpiritClick}>
-                <motion.div className="relative z-10 w-[280px] h-[380px] md:w-[400px] md:h-[550px] rounded-[40px] overflow-hidden transition-all duration-300" style={{ scale: engine.isBreathing || engine.isHolding ? 1 : spiritScale, filter: spiritGlow as any }} animate={isSilentMode ? { scale: 1.15, y: 20 } : !hasWoken ? { scale: 0.95, y: [0, 5, 0] } : { scale: 1.05, y: 0 }} transition={{ duration: 4, ease: "easeInOut" }} onPan={(e, info) => { if(hasWoken) engine.handlePet(); }} onPointerDown={() => engine.setIsHolding(true)} onPointerUp={() => engine.setIsHolding(false)}>
+            {/* Spirit & Tree Container */}
+            <motion.div className={`absolute inset-0 flex items-center justify-center ${!hasWoken ? 'cursor-pointer z-30' : 'z-30'}`} style={{ x: spiritX, y: spiritY }}>
+                <SoulTree resonance={resonance} memories={memories} />
+                <motion.div className="relative z-10 w-[280px] h-[380px] md:w-[400px] md:h-[550px] rounded-[40px] overflow-hidden transition-all duration-300" style={{ scale: engine.isBreathing || engine.isHolding ? 1 : spiritScale, filter: spiritGlow as any }} animate={isSilentMode ? { scale: 1.15, y: 20 } : !hasWoken ? { scale: 0.95, y: [0, 5, 0] } : { scale: 1.05, y: 0 }} transition={{ duration: 4, ease: "easeInOut" }} onClick={handleSpiritClick} onPan={(e, info) => { if(hasWoken) engine.handlePet(); }} onPointerDown={() => engine.setIsHolding(true)} onPointerUp={() => engine.setIsHolding(false)}>
                     <SpiritAura type={engine.equippedItems.aura} />
                     <Image src="/images/spirit_final.png" alt="Spirit" fill className="object-cover" />
                     <SpiritAccessory type={engine.equippedItems.head} />
@@ -192,7 +206,7 @@ export default function BambooForest() {
             </>
         )}
 
-      {/* [Fix] Expanded Top Right Controls - No Syntax Error */}
+      {/* Expanded Top Right Controls */}
       <AnimatePresence>
         {hasWoken && callStatus === 'idle' && !engine.showJournal && !engine.isBreathing && user && (
             <div className="absolute top-8 right-8 z-50 flex flex-col items-end gap-4 pointer-events-auto">
@@ -213,22 +227,33 @@ export default function BambooForest() {
                 >
                     {isPremium ? <Mail size={20} /> : <Lock size={16} />}
                 </motion.button>
+                {/* [New] Fire Ritual Button */}
+                <motion.button 
+                    initial={{ opacity: 0, scale: 0 }} 
+                    animate={{ opacity: 1, scale: 1 }} 
+                    whileHover={{ scale: 1.1 }} 
+                    whileTap={{ scale: 0.9 }} 
+                    className="group cursor-pointer flex flex-col items-center gap-2" 
+                    onClick={() => setShowFireRitual(true)}
+                >
+                    <div className="relative flex items-center justify-center w-12 h-12 bg-black/40 backdrop-blur-md rounded-full border border-red-500/30 shadow-[0_0_20px_rgba(239,68,68,0.2)] group-hover:bg-red-500/10 transition-colors">
+                        <Flame className="text-red-200" size={18} />
+                    </div>
+                </motion.button>
 
-                {isPremium && (
-                    <motion.button 
-                        initial={{ opacity: 0, scale: 0 }} 
-                        animate={{ opacity: 1, scale: 1 }} 
-                        whileHover={{ scale: 1.1 }} 
-                        whileTap={{ scale: 0.9 }} 
-                        className="group cursor-pointer flex flex-col items-center gap-2" 
-                        onClick={() => alert("타임 캡슐은 곧 열립니다.")}
-                    >
-                        <div className="relative flex items-center justify-center w-12 h-12 bg-black/40 backdrop-blur-md rounded-full border border-yellow-500/30 shadow-[0_0_20px_rgba(234,179,8,0.2)] group-hover:bg-yellow-500/10 transition-colors">
-                            <Hourglass className="text-yellow-200" size={18} />
-                            <div className="absolute inset-0 bg-yellow-400 rounded-full opacity-10 animate-pulse" />
-                        </div>
-                    </motion.button>
-                )}
+                {/* [New] Write Bottle Button */}
+                <motion.button 
+                    initial={{ opacity: 0, scale: 0 }} 
+                    animate={{ opacity: 1, scale: 1 }} 
+                    whileHover={{ scale: 1.1 }} 
+                    whileTap={{ scale: 0.9 }} 
+                    className="group cursor-pointer flex flex-col items-center gap-2" 
+                    onClick={() => setShowWriteBottle(true)}
+                >
+                    <div className="relative flex items-center justify-center w-12 h-12 bg-black/40 backdrop-blur-md rounded-full border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.2)] group-hover:bg-blue-500/10 transition-colors">
+                        <PenTool className="text-blue-200" size={18} />
+                    </div>
+                </motion.button>
 
                 {!engine.hasCollectedDew && (
                     <motion.button 
@@ -267,6 +292,10 @@ export default function BambooForest() {
         <AltarModal isOpen={engine.showAltar} onClose={() => engine.setShowAltar(false)} resonance={engine.resonance} artifacts={engine.ARTIFACTS} ownedItems={engine.ownedItems} equippedItems={engine.equippedItems} onUnlock={engine.unlockArtifact} onEquip={engine.equipArtifact} />
         <ProfileModal isOpen={showProfile} onClose={() => setShowProfile(false)} user={user} isPremium={isPremium} signOut={engine.signOut} getUserInitial={getUserInitial} />
         
+        {/* [New] Bottle Modals */}
+        <BottleWriteModal isOpen={showWriteBottle} onClose={() => setShowWriteBottle(false)} onSend={sendBottle} />
+        <BottleReadModal bottle={foundBottle} onClose={() => setFoundBottle(null)} onLike={likeBottle} />
+
         {/* Memory Ritual */}
         <MemoryRitual isOpen={engine.showMemoryRitual} onClose={() => engine.setShowMemoryRitual(false)} user={user} isPremium={isPremium} onFinalize={engine.finalizeMemory} onSaveCapsule={engine.saveVoiceCapsule} />
 
@@ -297,6 +326,9 @@ export default function BambooForest() {
                 </motion.div>
             )}
         </AnimatePresence>
+
+        {/* [New] Fire Ritual Modal */}
+        <FireRitualModal isOpen={showFireRitual} onClose={() => setShowFireRitual(false)} onBurn={performFireRitual} />
 
         {/* Journal Layer */}
         <AnimatePresence>

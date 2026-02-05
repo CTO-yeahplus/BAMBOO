@@ -1,7 +1,7 @@
 // app/hooks/engine/useSoulData.ts
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Memory, Artifact, ARTIFACTS, ArtifactType, ORACLE_DECK, OracleCard } from '../../types';
+import { Memory, Artifact, ARTIFACTS, ArtifactType, ORACLE_DECK, OracleCard, WhisperBottle } from '../../types';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,6 +31,9 @@ export function useSoulData(user: any, triggerSuccess: () => void) {
   const [todaysCard, setTodaysCard] = useState<OracleCard | null>(null);
   const [showOracleModal, setShowOracleModal] = useState(false);
 
+  // Bottle State
+  const [foundBottle, setFoundBottle] = useState<WhisperBottle | null>(null);
+
   const fetchMemories = useCallback(async () => {
       if (!user) return;
       const { data } = await supabase.from('memories').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
@@ -43,22 +46,12 @@ export function useSoulData(user: any, triggerSuccess: () => void) {
       if (data) setLetters(data);
   }, [user]);
 
-  // [Fix] 앱 종료 방지: 무한 루프 차단 로직 추가
   const checkOracle = useCallback(async () => {
       if (!user) return;
-      
-      // [Safety Guard] 이미 카드가 선택되었거나 모달이 열려있으면 중복 체크하지 않음 (Critical Fix)
       if (todaysCard || showOracleModal) return;
-
-      const todayStr = new Date().toDateString(); 
-      const { data } = await supabase.from('profiles').select('last_oracle_date').eq('id', user.id).single();
-      
-      // 오늘 뽑은 기록이 없으면 카드 선정
-      if (!data || data.last_oracle_date !== todayStr) {
-          const randomCard = ORACLE_DECK[Math.floor(Math.random() * ORACLE_DECK.length)];
-          setTodaysCard(randomCard);
-          setShowOracleModal(true);
-      }
+      const randomCard = ORACLE_DECK[Math.floor(Math.random() * ORACLE_DECK.length)];
+      setTodaysCard(randomCard);
+      setShowOracleModal(true);
   }, [user, todaysCard, showOracleModal]);
 
   const confirmOracle = async () => {
@@ -68,6 +61,59 @@ export function useSoulData(user: any, triggerSuccess: () => void) {
       setShowOracleModal(false);
       triggerSuccess(); 
       addResonance(30); 
+  };
+
+  const sendBottle = async (content: string) => {
+      if (!user) return;
+      const { error } = await supabase.from('whisper_bottles').insert({
+          user_id: user.id,
+          content: content
+      });
+      if (!error) {
+          triggerSuccess();
+          addResonance(50);
+      } else {
+          console.error(error);
+          alert("유리병을 띄우지 못했습니다.");
+      }
+  };
+
+  const findRandomBottle = async () => {
+      if (!user) return;
+      const { data } = await supabase.from('whisper_bottles')
+          .select('*')
+          .neq('user_id', user.id)
+          .limit(10)
+          .order('created_at', { ascending: false });
+
+      if (data && data.length > 0) {
+          const random = data[Math.floor(Math.random() * data.length)];
+          setFoundBottle(random);
+      } else {
+          setFoundBottle({
+              id: 0, content: "이 숲에 첫 번째 방문자가 되신 걸 환영합니다.", likes: 0, created_at: new Date().toISOString()
+          });
+      }
+  };
+
+  // [Fix] catch 블록 제거 및 error 객체 확인 패턴으로 변경
+  const likeBottle = async (bottleId: number) => {
+      if (!foundBottle) return;
+      // Optimistic update
+      setFoundBottle(prev => prev ? { ...prev, likes: prev.likes + 1 } : null);
+      
+      // 1. Try RPC call
+      const { error } = await supabase.rpc('increment_bottle_likes', { bottle_id: bottleId });
+
+      // 2. If RPC fails (e.g. function not found), use standard update
+      if (error) {
+          console.warn("RPC Failed, trying fallback update:", error.message);
+          const { data } = await supabase.from('whisper_bottles').select('likes').eq('id', bottleId).single();
+          if (data) {
+              await supabase.from('whisper_bottles').update({ likes: data.likes + 1 }).eq('id', bottleId);
+          }
+      }
+      triggerSuccess();
   };
 
   useEffect(() => {
@@ -105,6 +151,7 @@ export function useSoulData(user: any, triggerSuccess: () => void) {
       unlockArtifact, equipArtifact, 
       soulLevel, ARTIFACTS,
       saveVoiceCapsule,
-      todaysCard, showOracleModal, confirmOracle 
+      todaysCard, showOracleModal, confirmOracle,
+      sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle
   };
 }
