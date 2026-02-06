@@ -67,6 +67,38 @@ export function useSoulData(user: any, triggerSuccess: () => void, isPremium: bo
       addResonance(30); 
   };
 
+  // [New] Spirit Capsules State (정령의 목소리 보관함)
+  const [spiritCapsules, setSpiritCapsules] = useState<any[]>([]);
+
+  // Load Spirit Capsules (Local Storage)
+  useEffect(() => {
+      const saved = localStorage.getItem('spirit_capsules'); // 키 이름 변경
+      if (saved) setSpiritCapsules(JSON.parse(saved));
+  }, []);
+
+  // [New Function] 정령의 말 저장하기 (기존 saveVoiceCapsule과 이름 구분)
+  const keepSpiritVoice = (text: string) => {
+      const newCap = {
+          id: Date.now().toString(),
+          text, // 정령의 멘트 (TTS용)
+          created_at: new Date().toISOString(),
+      };
+      
+      const updated = [newCap, ...spiritCapsules];
+      setSpiritCapsules(updated);
+      localStorage.setItem('spirit_capsules', JSON.stringify(updated));
+      
+      // 알림 메시지도 구분
+      alert("정령의 속삭임을 기억 조각으로 보관했습니다.");
+  };
+
+  // [New Function] 정령의 말 삭제하기
+  const forgetSpiritVoice = (id: string) => {
+      const updated = spiritCapsules.filter(c => c.id !== id);
+      setSpiritCapsules(updated);
+      localStorage.setItem('spirit_capsules', JSON.stringify(updated));
+  };
+
   // [Modified] Send Bottle (구조 신호 옵션 추가)
   const sendBottle = async (content: string, isDistress: boolean = false) => {
     if (!user) return;
@@ -310,10 +342,9 @@ export function useSoulData(user: any, triggerSuccess: () => void, isPremium: bo
       todaysCard, showOracleModal, confirmOracle,
       sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle, replyToBottle, 
       // 4. [Missing Fix] 여기가 빠져서 에러가 났습니다! (필수 복구)
-      spiritForm, 
-      changeSpiritForm, 
-      SPIRIT_FORMS,
-      showGalleryModal, setShowGalleryModal,
-      monthlyMoods, fetchMonthlyMoods,
+      spiritForm, changeSpiritForm, SPIRIT_FORMS,showGalleryModal, setShowGalleryModal,
+      monthlyMoods, fetchMonthlyMoods, spiritCapsules,      // 정령 보관함 데이터
+      keepSpiritVoice,     // 정령 저장 함수
+      forgetSpiritVoice,
   };
 }

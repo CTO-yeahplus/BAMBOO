@@ -2,13 +2,15 @@
 
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Lock, Palette, Unlock, Zap, Sparkles,Trash2, User, LogOut, Download, Share2, Settings2, Volume2, Square, Mic, Heart, Send, Flame, CloudRain, Wind, Trees, Sliders, Power, StopCircle, Play } from 'lucide-react';
+import { Bell, X, Lock, Palette, Unlock, Zap, Sparkles, Trash2, Pause, User, LogOut, Download, Share2, Settings2, Volume2, Square, Mic, Heart, Send, Flame, CloudRain, Wind, Trees, Sliders, Power, StopCircle, Play, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { Artifact, ARTIFACTS, OracleCard, WhisperBottle, THEMES, ThemeId, SpiritFormType, SPIRIT_FORMS, DailyMood, EMOTION_COLORS } from '../types';
-import { toPng } from 'html-to-image'; // [Fix] 교체된 라이브러리
+import { toPng } from 'html-to-image';
 import QRCode from 'react-qr-code';
 import { BurningPaperEffect,  SpiritWisp, SpiritFox } from './ForestVisuals'; 
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { ShareCard } from './ShareCard';
+import { usePushNotification } from '../hooks/usePushNotification';
 
 // --- Helper Components ---
 const ModalOverlay = ({ children, onClose }: { children: React.ReactNode, onClose: () => void }) => (
@@ -133,11 +135,12 @@ export const SettingsModal = ({
     isOpen, onClose, 
     bgVolume, setBgVolume, voiceVolume, setVoiceVolume, // Master Volumes
     isMixerMode, setIsMixerMode, mixerVolumes, setMixerVolumes, applyPreset, // Mixer Props
-    currentTheme, setTheme, isPremium, binauralMode, setBinauralMode
+    currentTheme, setTheme, isPremium, binauralMode, setBinauralMode,
+    pushPermission, requestPushPermission,
 }: any) => {
 
     const [tab, setTab] = useState<'audio' | 'dreamscapes'>('audio'); // Tab State
-    
+
     if (!isOpen) return null;
 
     const channels = [
@@ -167,6 +170,30 @@ export const SettingsModal = ({
                     </button>
                     <button onClick={onClose} className="ml-auto"><X className="text-white/30 hover:text-white" /></button>
                 </div>
+                {/* 6. Notifications (New Section) */}
+            <div className="mt-6 pt-6 border-t border-white/5">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-white/80 text-xs font-medium flex items-center gap-2">
+                        <Bell size={14} className="text-white/60" /> 
+                        Spirit's Call
+                    </h3>
+                    <button
+                        // 👇 [Modified] 전달받은 Props 사용
+                        onClick={requestPushPermission}
+                        disabled={pushPermission === 'granted'}
+                        className={`text-[10px] px-3 py-1.5 rounded-full border transition-all ${
+                            pushPermission === 'granted' 
+                            ? 'bg-green-500/20 border-green-500/30 text-green-200 cursor-default' 
+                            : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+                        }`}
+                    >
+                        {pushPermission === 'granted' ? 'Active' : 'Enable Push'}
+                    </button>
+                </div>
+            <p className="text-[9px] text-white/30 mt-2 leading-relaxed">
+                활성화하면 정령이 가끔 안부를 묻거나, 오라클 카드가 도착했을 때 알려줍니다.
+            </p>
+            </div>  
 
                 {/* CONTENT: AUDIO (Existing) */}
                 {tab === 'audio' && (
@@ -488,7 +515,7 @@ export const BottleWriteModal = ({ isOpen, onClose, onSend }: any) => {
 };
 
 // --- 6. Bottle Read Modal (녹음 기능 완벽 구현됨) ---
-export const BottleReadModal = ({ bottle, onClose, onLike, onReply, isPremium }: { bottle: WhisperBottle | null, onClose: () => void, onLike: (id: number) => void, onReply: (id: number, blob: Blob) => void, isPremium: boolean }) => {
+export const BottleReadModal = ({ bottle, onClose, onLike, onReply, isPremium, onShare }: { bottle: WhisperBottle | null, onClose: () => void, onLike: (id: number) => void, onReply: (id: number, blob: Blob) => void, isPremium: boolean,onShare: (type: 'letter', data: any) => void }) => {
     // [Fix] 녹음 관련 상태와 로직 추가
     const [isRecording, setIsRecording] = useState(false);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -581,6 +608,15 @@ export const BottleReadModal = ({ bottle, onClose, onLike, onReply, isPremium }:
                             )}
                         </div>
                     )}
+                    {/* [New] Share Button (텍스트 바로 아래 배치) */}
+                    <div className="mb-6 flex justify-center">
+                        <button 
+                            onClick={() => onShare('letter', bottle)}
+                            className="text-[10px] text-white/30 hover:text-purple-300 flex items-center gap-1 transition-colors tracking-wider uppercase"
+                        >
+                            <Share2 size={10} /> Share this whisper
+                        </button>
+                    </div>
 
                     {/* Footer Actions */}
                     <div className="flex justify-center gap-4">
@@ -673,14 +709,15 @@ export const FireRitualModal = ({ isOpen, onClose, onBurn }: any) => {
 };
 
 // [New] Soul Calendar Modal
-export const SoulCalendarModal = ({ isOpen, onClose, moods, onMonthChange, currentYear, currentMonth }: { 
+export const SoulCalendarModal = ({ isOpen, onClose, moods, onMonthChange, currentYear, currentMonth, onShare }: { 
     isOpen: boolean, 
     onClose: () => void, 
     moods: DailyMood[], 
     onMonthChange: (y: number, m: number) => void,
     currentYear: number,
-    currentMonth: number 
-}) => {
+    currentMonth: number,
+    onShare: (type: 'calendar', data: any) => void 
+    }) => {
     
     if (!isOpen) return null;
 
@@ -773,15 +810,182 @@ export const SoulCalendarModal = ({ isOpen, onClose, moods, onMonthChange, curre
                     {calendarDays}
                 </div>
 
-                {/* Footer Legend */}
-                <div className="mt-6 flex justify-center gap-4 text-[9px] text-white/30">
-                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-yellow-400/50" />Happy</div>
-                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-400/50" />Sad</div>
-                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400/50" />Anger</div>
-                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-purple-400/50" />Lonely</div>
+                {/* [New] Footer Share Button */}
+                <div className="mt-6 pt-4 border-t border-white/5 flex flex-col gap-3">
+                    {/* 기존 범례(Legend)는 유지 */}
+                    <div className="mt-6 flex justify-center gap-4 text-[9px] text-white/30">
+                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-yellow-400/50" />Happy</div>
+                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-400/50" />Sad</div>
+                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400/50" />Anger</div>
+                        <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-purple-400/50" />Lonely</div>
+                    </div>
+                    {/* 공유 버튼 추가 */}
+                    <button 
+                        onClick={() => onShare('calendar', moods)}
+                        className="w-full py-3 mt-2 flex items-center justify-center gap-2 text-xs font-medium text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 rounded-xl transition-all border border-purple-500/20"
+                    >
+                        <Share2 size={14} />
+                        Share my Constellation
+                    </button>
                 </div>
             </div>
         </ModalOverlay>
     );
 };
 
+// [New] Soulography Modal (The Studio)
+export const SoulographyModal = ({ isOpen, onClose, type, data, userName }: { isOpen: boolean, onClose: () => void, type: 'calendar' | 'letter', data: any, userName: string }) => {
+    const cardRef = useRef<HTMLDivElement>(null);
+    const [isCapturing, setIsCapturing] = useState(false);
+    const [theme, setTheme] = useState<'modern' | 'receipt' | 'chart'>('modern'); // [Updated]
+
+    if (!isOpen) return null;
+
+    const handleShare = async () => {
+        if (!cardRef.current) return;
+        setIsCapturing(true);
+
+        try {
+            // 폰트 로딩 대기
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const dataUrl = await toPng(cardRef.current, {
+                cacheBust: true,
+                pixelRatio: 2, // 고해상도
+                backgroundColor: '#050505'
+            });
+
+            // 1. Web Share API 시도 (모바일)
+            if (navigator.share) {
+                const blob = await (await fetch(dataUrl)).blob();
+                const file = new File([blob], 'soulography.png', { type: 'image/png' });
+                await navigator.share({
+                    files: [file],
+                    title: 'My Soulography',
+                    text: 'From the Bamboo Forest.',
+                });
+            } else {
+                // 2. PC면 다운로드
+                const link = document.createElement('a');
+                link.download = `soulography-${type}-${Date.now()}.png`;
+                link.href = dataUrl;
+                link.click();
+            }
+        } catch (err) {
+            console.error("Capture failed:", err);
+            alert("이미지 생성에 실패했습니다.");
+        } finally {
+            setIsCapturing(false);
+        }
+    };
+
+    return (
+        <ModalOverlay onClose={onClose}>
+            <div className="bg-[#1a1a1a] p-4 rounded-3xl shadow-2xl flex flex-col items-center gap-4 max-h-[90vh] overflow-y-auto w-full max-w-sm">
+                {/* Header */}
+                <div className="flex justify-between items-center w-full px-2">
+                    <h3 className="text-white/80 font-serif italic">Soulography</h3>
+                    <button onClick={onClose}><X size={20} className="text-white/50" /></button>
+                </div>
+
+                {/* [Updated] 3-Way Theme Switcher */}
+                <div className="flex bg-black/40 p-1 rounded-full border border-white/10 w-full">
+                    {[
+                        { id: 'modern', label: 'Ethereal' },
+                        { id: 'receipt', label: 'Receipt' },
+                        { id: 'chart', label: 'Analysis' }
+                    ].map((t) => (
+                        <button 
+                            key={t.id}
+                            onClick={() => setTheme(t.id as any)}
+                            className={`flex-1 py-2 rounded-full text-[10px] uppercase tracking-widest transition-all ${theme === t.id ? 'bg-white/20 text-white font-bold shadow-sm' : 'text-white/40 hover:text-white/70'}`}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Preview Container */}
+                <div className="relative rounded-2xl overflow-hidden shadow-lg border border-white/10 scale-90 sm:scale-100 origin-top">
+                    {/* Theme prop 전달 */}
+                    <ShareCard ref={cardRef} type={type} data={data} userName={userName} theme={theme} />
+                    <div className="absolute inset-0 z-50 bg-transparent" />
+                </div>
+
+                {/* Share Button */}
+                <button 
+                    onClick={handleShare}
+                    disabled={isCapturing}
+                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-bold text-sm tracking-widest shadow-lg hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                    {isCapturing ? <Loader2 className="animate-spin" /> : <Share2 size={18} />}
+                    {isCapturing ? "Developing..." : "Share to Story"}
+                </button>
+            </div>
+        </ModalOverlay>
+    );
+};
+
+// [New] Voice Capsule Modal
+export const SpiritCapsuleModal = ({ isOpen, onClose, capsules, onDelete }: any) => {
+    const [playingId, setPlayingId] = useState<string | null>(null);
+
+    if (!isOpen) return null;
+
+    const handlePlay = (capsule: any) => {
+        // 브라우저 TTS 사용
+        window.speechSynthesis.cancel(); // 기존 음성 중단
+        
+        const utterance = new SpeechSynthesisUtterance(capsule.text);
+        utterance.lang = 'ko-KR'; // 한국어 설정
+        utterance.rate = 0.9; // 조금 천천히
+        utterance.pitch = 1.0;
+        
+        // 종료 시 상태 초기화
+        utterance.onend = () => setPlayingId(null);
+        
+        setPlayingId(capsule.id);
+        window.speechSynthesis.speak(utterance);
+    };
+
+    const handleStop = () => {
+        window.speechSynthesis.cancel();
+        setPlayingId(null);
+    };
+
+    return (
+        <ModalOverlay onClose={() => { handleStop(); onClose(); }}>
+            <div className="bg-[#121212] border border-white/10 p-6 rounded-2xl shadow-2xl w-full max-w-md h-[60vh] flex flex-col">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-white/90 font-serif italic text-xl">Spirit Whispers</h3>
+                    <button onClick={() => { handleStop(); onClose(); }}><X size={20} className="text-white/50" /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-hide">
+                    {capsules.length === 0 ? (
+                        <div className="text-center text-white/30 text-xs py-10">
+                            "간직하고 싶은 정령의 목소리가 있다면<br/>대화 중에 캡슐 버튼을 눌러보세요."
+                        </div>
+                    ) : (
+                        capsules.map((cap: any) => (
+                            <div key={cap.id} className={`p-4 rounded-xl border transition-all ${playingId === cap.id ? 'bg-white/10 border-purple-500/50' : 'bg-white/5 border-white/5 hover:border-white/20'}`}>
+                                <div className="flex justify-between items-start mb-3">
+                                    <span className="text-[10px] text-white/40 uppercase tracking-widest">{new Date(cap.created_at).toLocaleDateString()}</span>
+                                    <button onClick={() => onDelete(cap.id)} className="text-white/20 hover:text-red-400"><Trash2 size={12} /></button>
+                                </div>
+                                <p className="text-white/80 text-sm font-serif leading-relaxed line-clamp-2 mb-4">"{cap.text}"</p>
+                                
+                                <button 
+                                    onClick={() => playingId === cap.id ? handleStop() : handlePlay(cap)}
+                                    className={`w-full py-2 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition-all ${playingId === cap.id ? 'bg-purple-500 text-white' : 'bg-white/10 text-white/60 hover:bg-white/20'}`}
+                                >
+                                    {playingId === cap.id ? <><Pause size={12} /> Playing...</> : <><Play size={12} /> Replay Voice</>}
+                                </button>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </ModalOverlay>
+    );
+};

@@ -5,6 +5,7 @@ import { useAuth } from './useAuth';
 import { useHaptic } from './useHaptic';
 import { useSoundEngine } from './useSoundEngine';
 import { useParallax } from './useParallax';
+import { usePushNotification } from './usePushNotification';
 
 import { useSoulData } from './engine/useSoulData';
 import { useSpiritVapi } from './engine/useSpiritVapi';
@@ -40,10 +41,23 @@ export function useBambooEngine() {
     soul.fetchMemories();
   }, [triggerLight, soul]);
 
+  // [New] Soulography State
+  const [showSoulography, setShowSoulography] = useState(false);
+  const [soulographyType, setSoulographyType] = useState<'calendar' | 'letter'>('calendar');
+  const [soulographyData, setSoulographyData] = useState<any>(null);
+  const { permission, requestPermission } = usePushNotification();
+
+  const openSoulography = (type: 'calendar' | 'letter', data: any) => {
+      setSoulographyType(type);
+      setSoulographyData(data);
+      setShowSoulography(true);
+  };
+
   const voice = useSpiritVapi(user?.id ?? null, handleCallEnd, handleEmotionDetected);
   const [currentTheme, setCurrentTheme] = useState<ThemeId>('bamboo');
   const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({ clear: null, rain: null, snow: null, ember: null });
   const fadeIntervals = useRef<{ [key in WeatherType]: NodeJS.Timeout | null }>({ clear: null, rain: null, snow: null, ember: null });
+  const [showSpiritCapsules, setShowSpiritCapsules] = useState(false);
 
   const { x: rawX, y: rawY, requestAccess: requestGyro } = useParallax();
   const smoothOptions = { stiffness: 100, damping: 20 };
@@ -374,6 +388,33 @@ export function useBambooEngine() {
     
     }, [triggerSuccess, audioRefs, fadeToVolume, selectedAmbience, bgVolume, soul]);
 
+    const [showOnboarding, setShowOnboarding] = useState(false);
+
+    // [Check] 최초 방문 여부 확인
+    useEffect(() => {
+        const hasVisited = localStorage.getItem('has_visited_forest');
+        if (!hasVisited) {
+            setShowOnboarding(true);
+        }
+    }, []);
+
+    // [New] 온보딩 완료 핸들러
+    const handleOnboardingComplete = (weatherId: string, personaId: string) => {
+        // 1. 날씨(배경음) 설정
+        changeAmbience(weatherId as any);
+        
+        // 2. 정령 페르소나 설정
+        voice.setCurrentPersona(personaId);
+
+        // 3. 완료 처리
+        localStorage.setItem('has_visited_forest', 'true');
+        setShowOnboarding(false);
+        
+        // 4. 환영 효과
+        triggerSuccess();
+        setTimeout(() => wakeSpirit(), 1000); // 1초 뒤 정령 깨우기
+    };
+
   return {
       user, isPremium, signInWithGoogle, signOut, isMounted: true, 
       hasStarted, startExperience,
@@ -411,5 +452,14 @@ export function useBambooEngine() {
       showCalendar, setShowCalendar,
       calYear, setCalYear,
       calMonth, setCalMonth, binauralMode, setBinauralMode,
+      showSoulography, setShowSoulography, soulographyType, soulographyData, openSoulography,
+      pushPermission: permission, requestPushPermission: requestPermission,
+      showOnboarding, handleOnboardingComplete,
+      // 정령 보관함 (신규)
+      spiritCapsules: soul.spiritCapsules,
+      keepSpiritVoice: soul.keepSpiritVoice,
+      forgetSpiritVoice: soul.forgetSpiritVoice,
+      
+      showSpiritCapsules, setShowSpiritCapsules,
   };
 }

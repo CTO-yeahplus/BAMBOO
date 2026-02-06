@@ -4,14 +4,15 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Plus, X, Flame, Hourglass, Image as ImageIcon, 
-    Send, Droplets, Mail, ChevronUp, Trees, CloudRain, Wind, Calendar
+    Send, Droplets, Mail, ChevronUp, Trees, CloudRain, Wind, Calendar, Mic, Disc
 } from 'lucide-react';
 import { WeatherType } from '../types';
 
 // 1. 통합 액션 메뉴 (우측 하단)
 export const MagicSatchel = ({ 
     onOpenFire, onOpenBottle, onOpenCapsule, onOpenGallery, onOpenMailbox, onCollectDew,
-    hasCollectedDew, isPremium, onOpenCalendar
+    hasCollectedDew, isPremium, onOpenCalendar, onOpenSpiritCapsules,
+    onOpenCapsules,
 }: any) => {
     const [isOpen, setIsOpen] = useState(false);
 
@@ -20,8 +21,15 @@ export const MagicSatchel = ({
         { id: 'bottle', icon: <Send size={20} />, label: 'Whisper', action: onOpenBottle, color: 'bg-blue-500/20 text-blue-200' },
         { id: 'mailbox', icon: <Mail size={20} />, label: 'Letter', action: onOpenMailbox, color: 'bg-yellow-500/20 text-yellow-200' },
         { id: 'gallery', icon: <ImageIcon size={20} />, label: 'Gallery', action: onOpenGallery, color: 'bg-purple-500/20 text-purple-200' },
-        { id: 'calendar', icon: <Calendar size={20} />, label: 'Moods', action: onOpenCalendar, color: 'bg-green-500/20 text-green-200' }, // [New]
-    ];
+        { id: 'calendar', icon: <Calendar size={20} />, label: 'Moods', action: onOpenCalendar, color: 'bg-green-500/20 text-green-200' },
+        // 정령 목소리 보관함 (Spirit Whispers)
+        { 
+            id: 'whisper', // 고유 ID (capsule과 겹치지 않게 변경)
+            icon: <Disc size={20} />, 
+            label: 'Spirit Whispers', 
+            action: onOpenSpiritCapsules, 
+            color: 'bg-indigo-500/20 text-indigo-200' 
+        },    ];
 
     if (isPremium) {
         menuItems.push({ id: 'capsule', icon: <Hourglass size={20} />, label: 'Capsule', action: onOpenCapsule, color: 'bg-amber-500/20 text-amber-200' });

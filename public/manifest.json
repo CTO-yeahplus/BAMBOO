@@ -1,22 +1,24 @@
 {
-  "name": "Bamboo Forest",
-  "short_name": "Forest",
-  "description": "A sanctuary for your soul.",
+  "name": "Bamboo Forest: The Soul Shelter",
+  "short_name": "BambooForest",
+  "description": "A quiet bamboo forest for your weary soul. Talk to the spirit, find your peace.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#050505",
+  "theme_color": "#050505",
   "orientation": "portrait",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

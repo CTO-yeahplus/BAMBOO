@@ -3,18 +3,23 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
-import { Book, X, Star, Share2, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Settings2, Volume2, Mic, LogIn, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, Keyboard, SendHorizontal, Palette, Mail, Moon, Bed, Square, PenTool, ImageIcon } from 'lucide-react';
+import { Book, X, Star, Share2, Disc, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Settings2, Volume2, Mic, LogIn, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, Keyboard, SendHorizontal, Palette, Mail, Moon, Bed, Square, PenTool, ImageIcon } from 'lucide-react';
 import { MemoryGalleryModal, FullImageViewer } from './components/MemoryGalleryModal';
 import { useBambooEngine } from './hooks/useBambooEngine';
 import { useRipple } from './hooks/useRipple';
 import { Memory, WeatherType, Particle, THEMES } from './types';
 import { getMoonPhase, getMoonIconPath } from './utils/moonPhase';
+import { InstallPrompt } from './components/InstallPrompt';
 
 // Components
 import { ForestBackground, SpringPetal, SummerFirefly, AutumnLeaf, ConstellationLayer, OrbitLayer, MemoryFlower, GoldenCocoon, FireflyLayer, SoulTree, FloatingBottle, SpiritWisp, SpiritFox, SpiritGuardian } from './components/ForestVisuals';
 import { OracleModal, SettingsModal, AltarModal, ProfileModal, BottleWriteModal, BottleReadModal, FireRitualModal, SoulCalendarModal } from './components/ForestModals';
 import { MemoryRitual } from './components/MemoryRitual';
 import { TimeCapsuleModal } from './components/TimeCapsuleModal';
+import { SoulographyModal } from './components/ForestModals';
+import { GenesisRitual } from './components/GenesisRitual';
+import { SpiritCapsuleModal } from './components/ForestModals';
+
 // [New] UI Components
 import { MagicSatchel, MinimalAmbience } from './components/ForestControls';
 
@@ -26,15 +31,15 @@ export default function BambooForest() {
   const engine = useBambooEngine();
   
   const { 
-      user, isPremium, memories, 
-      bgVolume, voiceVolume, 
-      motionValues, hasWoken, callStatus, isSilentMode,
-      fireflies, broadcastTouch,
-      resonance,
-      // Bottle functions
-      sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle, replyToBottle,
-      showFireRitual, setShowFireRitual, performFireRitual, saveVoiceCapsule,
-      spiritForm, SPIRIT_FORMS, changeSpiritForm
+    user, isPremium, memories, 
+    bgVolume, voiceVolume, 
+    motionValues, hasWoken, callStatus, isSilentMode,
+    fireflies, broadcastTouch,
+    resonance,
+    // Bottle functions
+    sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle, replyToBottle,
+    showFireRitual, setShowFireRitual, performFireRitual, saveVoiceCapsule,
+    spiritForm, SPIRIT_FORMS, changeSpiritForm
   } = engine;
 
   const currentThemeConfig = THEMES.find(t => t.id === engine.currentTheme) || THEMES[0];
@@ -106,50 +111,57 @@ export default function BambooForest() {
 
   return (
     <main className="relative flex flex-col items-center justify-center w-full h-screen overflow-hidden bg-black touch-none" onMouseMove={(e) => {}} onPointerDown={handleGlobalClick}>
-        
-        {/* [Critical Fix] ID 직통 케이블 연결 (오디오 레이어) */}
+      {/* [Critical Fix] ID 직통 케이블 연결 (오디오 레이어) */}
         <div style={{ display: 'none' }}>
-            <audio 
-                id="spirit-audio-clear"
-                ref={(el) => { if (el) engine.audioRefs.current['clear'] = el; }} 
-                src="/sounds/forest_ambience.mp3" 
-                loop playsInline 
-            />
-            <audio 
-                id="spirit-audio-rain"
-                ref={(el) => { if (el) engine.audioRefs.current['rain'] = el; }} 
-                src="/sounds/rain.mp3" 
-                loop playsInline 
-            />
-            <audio 
-                id="spirit-audio-snow"
-                ref={(el) => { if (el) engine.audioRefs.current['snow'] = el; }} 
-                src="/sounds/wind.mp3" 
-                loop playsInline 
-            />
-            <audio 
-                id="spirit-audio-ember"
-                ref={(el) => { if (el) engine.audioRefs.current['ember'] = el; }} 
-                src="/sounds/fire.mp3" 
-                loop playsInline 
-            />
-            {/* [New] Binaural Beats Layers (Invisible Therapy) */}
-            <audio 
-                id="binaural-delta"
-                src="/sounds/binaural_delta.mp3" // Deep Sleep (0.5~4Hz)
-                loop playsInline 
-            />
-            <audio 
-                id="binaural-alpha"
-                src="/sounds/binaural_alpha.mp3" // Focus (8~14Hz)
-                loop playsInline 
-            />
-            <audio 
-                id="binaural-theta"
-                src="/sounds/binaural_theta.mp3" // Meditation (4~8Hz)
-                loop playsInline 
-            />
+          <audio 
+              id="spirit-audio-clear"
+              ref={(el) => { if (el) engine.audioRefs.current['clear'] = el; }} 
+              src="/sounds/forest_ambience.mp3" 
+              loop playsInline 
+          />
+          <audio 
+              id="spirit-audio-rain"
+              ref={(el) => { if (el) engine.audioRefs.current['rain'] = el; }} 
+              src="/sounds/rain.mp3" 
+              loop playsInline 
+          />
+          <audio 
+              id="spirit-audio-snow"
+              ref={(el) => { if (el) engine.audioRefs.current['snow'] = el; }} 
+              src="/sounds/wind.mp3" 
+              loop playsInline 
+          />
+          <audio 
+              id="spirit-audio-ember"
+              ref={(el) => { if (el) engine.audioRefs.current['ember'] = el; }} 
+              src="/sounds/fire.mp3" 
+              loop playsInline 
+          />
+          {/* [New] Binaural Beats Layers (Invisible Therapy) */}
+          <audio 
+              id="binaural-delta"
+              src="/sounds/binaural_delta.mp3" // Deep Sleep (0.5~4Hz)
+              loop playsInline 
+          />
+          <audio 
+              id="binaural-alpha"
+              src="/sounds/binaural_alpha.mp3" // Focus (8~14Hz)
+              loop playsInline 
+          />
+          <audio 
+              id="binaural-theta"
+              src="/sounds/binaural_theta.mp3" // Meditation (4~8Hz)
+              loop playsInline 
+          />
         </div>
+        {/* [New] Genesis Ritual (Onboarding) */}
+        <AnimatePresence>
+          {engine.showOnboarding && (
+              <GenesisRitual onComplete={engine.handleOnboardingComplete} />
+          )}
+        </AnimatePresence>
+
+        <InstallPrompt /> 
 
         <ForestBackground themeId={engine.currentTheme} themeConfig={currentThemeConfig}>
         
@@ -240,23 +252,23 @@ export default function BambooForest() {
         <div className="absolute top-[65%] left-0 right-0 z-40 w-full flex flex-col items-center gap-8 pointer-events-none">
             <AnimatePresence mode="wait">{callStatus === 'idle' && !engine.showJournal && !engine.spiritMessage && !engine.isBreathing && <motion.div key={WHISPERS[whisperIndex]} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute -top-16 text-white/60 text-sm font-light italic tracking-wider drop-shadow-md text-center px-4 w-full">{WHISPERS[whisperIndex]}</motion.div>}</AnimatePresence>
             <AnimatePresence mode="wait">
-                {callStatus === 'idle' && !engine.showJournal && !engine.isBreathing ? (
-                    !hasWoken ? null : !user ? (
-                        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-4 pointer-events-auto">
-                            <button onClick={engine.signInWithGoogle} className="group flex items-center gap-3 px-8 py-4 bg-white/90 hover:bg-white text-black font-medium rounded-full shadow-[0_0_40px_rgba(255,255,255,0.1)] transition-all active:scale-95"><span className="tracking-widest text-xs uppercase">Begin your journey</span></button>
-                        </motion.div>
-                    ) : (
-                        <motion.button initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }} onClick={engine.toggleCall} className="px-12 py-6 text-sm font-medium text-white bg-white/10 border border-white/20 rounded-full backdrop-blur-xl shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-white/20 transition-all tracking-widest cursor-pointer pointer-events-auto">숲으로 입장하기</motion.button>
-                    )
-                ) : engine.callStatus !== 'idle' ? (
-                    <motion.div key="active-status" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-6 pointer-events-auto">
-                        <div className="flex items-center gap-6">
-                            <button onClick={engine.toggleSilentMode} className={`p-4 rounded-full border transition-all duration-300 ${isSilentMode ? 'bg-white/20 border-white/40 text-white' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'}`}><Keyboard size={20} /></button>
-                            <button onClick={engine.toggleCall} className="group relative z-50 p-6 rounded-full bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-500/40 transition-all duration-300 cursor-pointer active:scale-90"><span className="sr-only">End Call</span><motion.div animate={{ rotate: engine.callStatus === 'connecting' ? 0 : 90 }}><X size={24} className="text-white/80 group-hover:text-red-200" /></motion.div></button>
-                        </div>
-                        <div className="flex flex-col items-center gap-2"><motion.span className="text-[10px] font-medium text-green-400/60 tracking-[0.4em] uppercase" animate={engine.callStatus === 'processing' ? { opacity: [1, 0.5, 1] } : { opacity: 1 }} transition={{ duration: 1.5, repeat: Infinity }}>{engine.getStatusText()}</motion.span></div>
+              {callStatus === 'idle' && !engine.showJournal && !engine.isBreathing ? (
+                !hasWoken ? null : !user ? (
+                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-4 pointer-events-auto">
+                        <button onClick={engine.signInWithGoogle} className="group flex items-center gap-3 px-8 py-4 bg-white/90 hover:bg-white text-black font-medium rounded-full shadow-[0_0_40px_rgba(255,255,255,0.1)] transition-all active:scale-95"><span className="tracking-widest text-xs uppercase">Begin your journey</span></button>
                     </motion.div>
-                ) : null}
+                ) : (
+                    <motion.button initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }} onClick={engine.toggleCall} className="px-12 py-6 text-sm font-medium text-white bg-white/10 border border-white/20 rounded-full backdrop-blur-xl shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-white/20 transition-all tracking-widest cursor-pointer pointer-events-auto">숲으로 입장하기</motion.button>
+                )
+              ) : engine.callStatus !== 'idle' ? (
+                <motion.div key="active-status" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-6 pointer-events-auto">
+                    <div className="flex items-center gap-6">
+                        <button onClick={engine.toggleSilentMode} className={`p-4 rounded-full border transition-all duration-300 ${isSilentMode ? 'bg-white/20 border-white/40 text-white' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'}`}><Keyboard size={20} /></button>
+                        <button onClick={engine.toggleCall} className="group relative z-50 p-6 rounded-full bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-500/40 transition-all duration-300 cursor-pointer active:scale-90"><span className="sr-only">End Call</span><motion.div animate={{ rotate: engine.callStatus === 'connecting' ? 0 : 90 }}><X size={24} className="text-white/80 group-hover:text-red-200" /></motion.div></button>
+                    </div>
+                    <div className="flex flex-col items-center gap-2"><motion.span className="text-[10px] font-medium text-green-400/60 tracking-[0.4em] uppercase" animate={engine.callStatus === 'processing' ? { opacity: [1, 0.5, 1] } : { opacity: 1 }} transition={{ duration: 1.5, repeat: Infinity }}>{engine.getStatusText()}</motion.span></div>
+                </motion.div>
+              ) : null}
             </AnimatePresence>
         </div>
 
@@ -312,6 +324,8 @@ export default function BambooForest() {
                         alert("영혼의 서신은 성소 멤버십 회원에게만 도착합니다.");
                     }
                   }}
+                  // 정령 목소리 보관함 (Spirit Whispers) - 누락된 부분!
+                  onOpenSpiritCapsules={() => engine.setShowSpiritCapsules(true)}
                 />
 
                 <SoulCalendarModal 
@@ -321,6 +335,7 @@ export default function BambooForest() {
                   currentYear={engine.calYear}
                   currentMonth={engine.calMonth}
                   onMonthChange={(y, m) => { engine.setCalYear(y); engine.setCalMonth(m); }}
+                  onShare={engine.openSoulography}
                 />
                 
                 {/* Left Bottom: Settings */}
@@ -334,6 +349,33 @@ export default function BambooForest() {
                     </motion.button>
                 </div>
             </>
+        )}
+
+        {/* [New] 'Capture' Button (정령의 말 저장 UI) */}
+        {engine.spiritMessage && (
+            <div className="absolute bottom-32 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
+                {/* 자막 컨테이너: pointer-events-auto로 설정하여 이 부분만 클릭 가능하게 함 */}
+                <div className="pointer-events-auto bg-black/40 backdrop-blur-md border border-white/10 px-8 py-5 rounded-2xl max-w-md w-full text-center relative group shadow-2xl transition-all duration-500 hover:bg-black/60 hover:border-white/20">
+                    
+                    {/* 정령의 메시지 텍스트 */}
+                    <p className="text-white/90 font-serif text-sm md:text-base leading-relaxed drop-shadow-md animate-fade-in">
+                        {engine.spiritMessage}
+                    </p>
+                    
+                    {/* 캡슐 저장 버튼 (컨테이너에 호버 시 등장) */}
+                    <button 
+                        onClick={() => engine.keepSpiritVoice(engine.spiritMessage!)} 
+                        className="absolute -top-3 -right-3 bg-gradient-to-br from-purple-600 to-indigo-600 text-white p-2.5 rounded-full shadow-[0_0_15px_rgba(124,58,237,0.5)] opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 transition-all duration-300 hover:scale-110 hover:brightness-110 active:scale-95"
+                        title="이 속삭임을 기억 조각으로 보관하기"
+                    >
+                        {/* LP판처럼 천천히 돌아가는 아이콘 */}
+                        <Disc size={16} className="animate-[spin_4s_linear_infinite]" />
+                    </button>
+
+                    {/* 장식용: 텍스트 하단의 미세한 빛 */}
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                </div>
+            </div>
         )}
 
         </ForestBackground>
@@ -356,6 +398,10 @@ export default function BambooForest() {
             isPremium={isPremium}
             binauralMode={engine.binauralMode}
             setBinauralMode={engine.setBinauralMode}
+            pushPermission={engine.pushPermission}
+            requestPushPermission={engine.requestPushPermission}
+            showOnboarding={engine.showOnboarding}
+            handleOnboardingComplete={engine.handleOnboardingComplete}
         />
         
         <AltarModal 
@@ -378,6 +424,7 @@ export default function BambooForest() {
         <BottleReadModal 
             bottle={foundBottle} onClose={() => setFoundBottle(null)} 
             onLike={likeBottle} onReply={replyToBottle} isPremium={isPremium}
+            onShare={engine.openSoulography}
         />
 
         <FireRitualModal 
@@ -387,10 +434,25 @@ export default function BambooForest() {
         <TimeCapsuleModal 
             isOpen={showCapsuleModal} onClose={() => setShowCapsuleModal(false)} onSave={engine.saveVoiceCapsule} 
         />
+        <SpiritCapsuleModal 
+            isOpen={engine.showSpiritCapsules} // 변수명 변경
+            onClose={() => engine.setShowSpiritCapsules(false)}
+            capsules={engine.spiritCapsules} // 데이터 변경
+            onDelete={engine.forgetSpiritVoice} // 함수 변경
+        />
         
         <MemoryRitual 
             isOpen={engine.showMemoryRitual} onClose={() => engine.setShowMemoryRitual(false)} 
             user={user} isPremium={isPremium} onFinalize={engine.finalizeMemory} onSaveCapsule={engine.saveVoiceCapsule} 
+        />
+
+        {/* [New] Soulography Modal */}
+        <SoulographyModal 
+            isOpen={engine.showSoulography} 
+            onClose={() => engine.setShowSoulography(false)}
+            type={engine.soulographyType}
+            data={engine.soulographyData}
+            userName={user?.email?.split('@')[0] || "Traveler"}
         />
 
         {/* Gallery & Viewer */}
@@ -422,8 +484,22 @@ export default function BambooForest() {
                         <button onClick={() => setSelectedLetter(null)} className="absolute top-6 right-6 text-white/20 hover:text-white"><X /></button>
                         <div className="text-center mb-12"><Sparkles className="w-6 h-6 text-yellow-500/50 mx-auto mb-4" /><h3 className="text-white/40 text-xs font-mono uppercase tracking-[0.3em]">{selectedLetter.month}</h3></div>
                         <p className="text-white/80 font-serif text-lg md:text-xl leading-relaxed whitespace-pre-wrap text-justify">{selectedLetter.content}</p>
-                        <div className="mt-12 text-right"><p className="text-white/30 text-xs font-serif italic">- 숲의 정령</p></div>
-                    </motion.div>
+                        
+                        {/* [New] 하단 서명 및 공유 버튼 */}
+                        <div className="mt-12 flex justify-between items-end border-t border-white/5 pt-6">
+                            {/* 공유 버튼 */}
+                            <button 
+                                onClick={() => engine.openSoulography('letter', selectedLetter)} // 👈 [New] 연결
+                                className="flex items-center gap-2 text-xs text-white/30 hover:text-purple-300 transition-colors uppercase tracking-widest group"
+                            >
+                                <Share2 size={14} className="group-hover:text-purple-300 transition-colors" />
+                                Share Letter
+                            </button>
+                            
+                            {/* 서명 */}
+                            <p className="text-white/30 text-xs font-serif italic">- 숲의 정령</p>
+                      </div>                    
+                        </motion.div>
                 </motion.div>
             )}
         </AnimatePresence>
