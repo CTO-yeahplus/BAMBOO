@@ -184,8 +184,8 @@ export const OracleModal = ({ isOpen, onClose, onDrawCard, todaysCard, isLoading
                     <OracleCard 
                         card={todaysCard} 
                         isFlipped={isFlipped} 
-                        onClick={handleCardClick}
-                        disabled={isLoading || todaysCard} // 로딩 중이거나 이미 뽑았으면 클릭 방지
+                        onClick={todaysCard ? onClose : handleCardClick}
+                        disabled={isLoading || todaysCard}
                     />
                     
                     {/* 안내 문구 */}
@@ -253,6 +253,14 @@ export const OracleModal = ({ isOpen, onClose, onDrawCard, todaysCard, isLoading
                                     <span className="font-serif">해석 보기 (Reveal Interpretation)</span>
                                 </button>
                             )}
+                            {/* 👇 [NEW] 숲으로 입장하기 버튼 (필수 추가) */}
+                            <button
+                                onClick={onClose}
+                                className="w-full py-4 bg-gradient-to-r from-[#c5a47e] to-[#e0c3a3] hover:brightness-110 text-[#0f0f1a] font-bold rounded-xl shadow-[0_0_20px_rgba(197,164,126,0.3)] flex items-center justify-center gap-2 transition-all active:scale-95 mt-2"
+                            >
+                                <span className="uppercase tracking-widest text-xs">Begin Journey</span>
+                                <ChevronRight size={16} />
+                            </button>
                         </motion.div>
                     )}
                 </AnimatePresence>

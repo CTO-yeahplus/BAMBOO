@@ -110,6 +110,12 @@ export default function BambooForest() {
       return () => clearInterval(interval); 
   }, []);
 
+  // 👇 [New] 1. Focus Logic Definition (대화 집중 모드 감지)
+  const isFocusMode = ['active', 'speaking', 'listening'].includes(callStatus);
+
+  // 시네마틱 애니메이션 설정 (아주 부드러운 전환)
+  const cinematicTransition = { duration: 2.5, ease: "easeInOut" } as const;
+
   return (
     <main className="relative flex flex-col items-center justify-center w-full h-screen overflow-hidden bg-black touch-none" onMouseMove={(e) => {}} onPointerDown={handleGlobalClick}>
       {/* [Critical Fix] ID 직통 케이블 연결 (오디오 레이어) */}
@@ -181,9 +187,19 @@ export default function BambooForest() {
             )}
         </AnimatePresence>
 
-        {/* Background Layers */}
-        <motion.div className="absolute inset-0 w-full h-full" animate={{ opacity: 1 }} transition={{ duration: 2 }}>
+        {/* 2. Background Layers Group (배경 요소 그룹화 및 블러 처리) */}
+        <motion.div 
+            className="absolute inset-0 w-full h-full"
+            initial={false}
+            animate={{ 
+                filter: isFocusMode ? "blur(8px) brightness(0.6)" : "blur(0px) brightness(1)",
+                scale: isFocusMode ? 1.05 : 1 // 살짝 줌인되는 효과 추가 (Depth 강화)
+            }}
+            transition={cinematicTransition}
+        >
+            {/* 기존 배경 레이어들 (907라인 ~ 914라인)을 이 안으로 포함 */}
             <motion.div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-t from-black/80 via-gray-900/50 to-transparent mix-blend-hard-light" animate={{ opacity: hasWoken ? 0 : 1 }} transition={{ duration: 3 }} />
+            
             <motion.div className="absolute inset-[-5%] w-[110%] h-[110%]" style={{ x: bgX, y: bgY }}>
                 <motion.div className={`absolute inset-0 bg-gradient-to-b ${engine.backgroundGradient.join(' ')}`} animate={{ opacity: callStatus === 'idle' && !engine.showJournal ? 0.7 : engine.showJournal ? 0.2 : 1 }} transition={{ duration: 2.5 }} />
             </motion.div>
@@ -210,43 +226,64 @@ export default function BambooForest() {
                     return <motion.div key={p.id} className="absolute pointer-events-none bg-white/50 w-1 h-1 rounded-full" style={{ left: `${p.x}%`, top: `${p.y}%` }} animate={{ y: ['-10vh', '110vh'] }} transition={{ duration: p.duration, repeat: Infinity, ease: "linear" }} />;
                 })}
             </motion.div>
-
-            {/* Spirit & Tree Container */}
-            <motion.div className={`absolute inset-0 flex items-center justify-center ${!hasWoken ? 'cursor-pointer z-30' : 'z-30'}`} style={{ x: spiritX, y: spiritY }}>
-                <SoulTree resonance={resonance} memories={memories} />
-                <motion.div 
-                    className="relative z-10 w-[280px] h-[380px] md:w-[400px] md:h-[550px] flex items-center justify-center transition-all duration-300 pointer-events-auto" 
-                    style={{ scale: engine.isBreathing || engine.isHolding ? 1 : spiritScale, filter: spiritGlow as any }} 
-                    animate={isSilentMode ? { scale: 1.15, y: 20 } : !hasWoken ? { scale: 0.95, y: [0, 5, 0] } : { scale: 1.05, y: 0 }} 
-                    transition={{ duration: 4, ease: "easeInOut" }} 
-                    onClick={handleSpiritClick} 
-                    onPan={(e, info) => { if(hasWoken) engine.handlePet(); }} 
-                    onPointerDown={() => engine.setIsHolding(true)} 
-                    onPointerUp={() => engine.setIsHolding(false)}
-                >
-                    {/* Spirit Forms */}
-                    {spiritForm === 'wisp' && (<div className="scale-150 cursor-pointer"><SpiritWisp /></div>)}
-                    {spiritForm === 'fox' && (<div className="scale-125 cursor-pointer"><SpiritFox /></div>)}
-                    {spiritForm === 'guardian' && (
-                        <SpiritGuardian 
-                            resonance={motionValues.springVolume} 
-                            isBreathing={engine.isBreathing}
-                            isHolding={engine.isHolding}
-                            spiritGlowOpacity={spiritGlowOpacity}
-                            equippedItems={engine.equippedItems}
-                        />
-                    )}
-
-                    {/* Spirit Overlays */}
-                    {!hasWoken && <div className="absolute inset-0 flex flex-col items-center justify-center z-50"><motion.div initial={{ opacity: 0 }} animate={{ opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 3, repeat: Infinity }} className="flex flex-col items-center gap-4"><MousePointerClick className="text-white/50 w-12 h-12" /><p className="text-white/60 font-light text-sm tracking-[0.2em] uppercase">Touch to awaken</p></motion.div></div>}
-                    {engine.isBreathing && <div className="absolute inset-0 flex items-center justify-center z-50"><motion.p className="text-white/90 font-light text-xl tracking-[0.4em] uppercase drop-shadow-lg" animate={{ opacity: [0, 1, 1, 0], scale: [0.9, 1.1, 1.1, 0.9] }} transition={{ duration: 19, times: [0, 0.2, 0.8, 1], repeat: Infinity }}>Breathe</motion.p></div>}
-                </motion.div>
-            </motion.div>
         </motion.div>
+
+        {/* 👇 [New] 3. Cinematic Vignette Layer (시네마틱 비네팅) */}
+        {/* 정령 뒤쪽, 배경 앞쪽에 위치하여 가장자리를 어둡게 만듦 */}
+        <motion.div 
+            className="absolute inset-0 pointer-events-none z-20 bg-[radial-gradient(circle_at_center,transparent_0%,black_120%)]"
+            animate={{ 
+                opacity: isFocusMode ? 0.8 : 0, // 대화 중에만 어두워짐
+            }}
+            transition={cinematicTransition}
+        />
+
+          {/* Spirit & Tree Container */}
+          <motion.div className={`absolute inset-0 flex items-center justify-center ${!hasWoken ? 'cursor-pointer z-30' : 'z-30'}`} style={{ x: spiritX, y: spiritY }}>
+              {/* 나무(SoulTree)도 배경의 일부이므로 isFocusMode일 때 흐려짐 */}
+             <motion.div animate={{ filter: isFocusMode ? "blur(4px)" : "blur(0px)" }} transition={cinematicTransition}>
+                <SoulTree resonance={resonance} memories={memories} />
+             </motion.div>
+              <motion.div 
+                  className="relative z-10 w-[280px] h-[380px] md:w-[400px] md:h-[550px] flex items-center justify-center transition-all duration-300 pointer-events-auto" 
+                  style={{ scale: engine.isBreathing || engine.isHolding ? 1 : spiritScale, filter: spiritGlow as any }} 
+                  animate={isSilentMode ? { scale: 1.15, y: 20 } : !hasWoken ? { scale: 0.95, y: [0, 5, 0] } : { scale: 1.05, y: 0 }} 
+                  transition={{ duration: 4, ease: "easeInOut" }} 
+                  onClick={handleSpiritClick} 
+                  onPan={(e, info) => { if(hasWoken) engine.handlePet(); }} 
+                  onPointerDown={() => engine.setIsHolding(true)} 
+                  onPointerUp={() => engine.setIsHolding(false)}
+              >
+                  {/* Spirit Forms */}
+                  {spiritForm === 'wisp' && (<div className="scale-150 cursor-pointer"><SpiritWisp /></div>)}
+                  {spiritForm === 'fox' && (<div className="scale-125 cursor-pointer"><SpiritFox /></div>)}
+                  {spiritForm === 'guardian' && (
+                      <SpiritGuardian 
+                          resonance={motionValues.springVolume} 
+                          isBreathing={engine.isBreathing}
+                          isHolding={engine.isHolding}
+                          spiritGlowOpacity={spiritGlowOpacity}
+                          equippedItems={engine.equippedItems}
+                      />
+                  )}
+
+                  {/* Spirit Overlays */}
+                  {!hasWoken && <div className="absolute inset-0 flex flex-col items-center justify-center z-50"><motion.div initial={{ opacity: 0 }} animate={{ opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 3, repeat: Infinity }} className="flex flex-col items-center gap-4"><MousePointerClick className="text-white/50 w-12 h-12" /><p className="text-white/60 font-light text-sm tracking-[0.2em] uppercase">Touch to awaken</p></motion.div></div>}
+                  {engine.isBreathing && <div className="absolute inset-0 flex items-center justify-center z-50"><motion.p className="text-white/90 font-light text-xl tracking-[0.4em] uppercase drop-shadow-lg" animate={{ opacity: [0, 1, 1, 0], scale: [0.9, 1.1, 1.1, 0.9] }} transition={{ duration: 19, times: [0, 0.2, 0.8, 1], repeat: Infinity }}>Breathe</motion.p></div>}
+              </motion.div>
+          </motion.div>
 
         {/* --- UI Controls (Apple Style Renovation) --- */}
         
         {/* 1. Silent Mode Chat UI */}
+        <motion.div 
+            className="absolute inset-0 z-40 pointer-events-none"
+            animate={{ 
+                opacity: isFocusMode ? 0 : 1, // 대화 중에는 UI가 사라짐
+                //pointerEvents: isFocusMode ? 'none' : 'auto' 
+            }}
+            transition={{ duration: 1 }} // 천천히 사라짐
+        >
         <AnimatePresence>{isSilentMode && (<motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="absolute bottom-32 left-0 right-0 z-50 flex justify-center px-4 pointer-events-auto"><div className="w-full max-w-md relative"><div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-full flex items-center p-2 shadow-2xl"><input type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} onKeyDown={handleKeyDown} placeholder="정령에게 속삭여보세요..." className="flex-1 bg-transparent border-none text-white/90 placeholder-white/30 px-4 py-2 text-sm focus:outline-none" /><button onClick={handleSendMessage} className="p-3 bg-white/10 rounded-full hover:bg-white/20 text-white"><SendHorizontal size={18} /></button></div><div className="absolute -bottom-10 left-0 right-0 flex justify-center"><button onClick={engine.toggleSilentMode} className="text-white/30 hover:text-white/50 text-[10px] uppercase tracking-widest flex items-center gap-1"><X size={12} /> Close Whispers</button></div></div></motion.div>)}</AnimatePresence>
 
         {/* 2. Whisper Text Overlay */}
@@ -379,16 +416,16 @@ export default function BambooForest() {
                 </div>
             </div>
         )}
+        </motion.div>
 
         </ForestBackground>
+        
 
         {/* --- MODALS --- */}
         {/* 👇 DailyOracleModal 연결 수정 */}
         <OracleModal 
-            isOpen={engine.showOracleModal} // 혹은 engine.showDailyOracle (본인 state 이름 확인)
-            onClose={() => engine.confirmOracle()} // 닫기 함수
-            
-            // [Fix] 여기가 비어 있어서 에러가 났던 것입니다.
+            isOpen={engine.showOracleModal && !introVisible} 
+            onClose={() => engine.confirmOracle()} 
             onDrawCard={engine.drawOracleCard} 
             todaysCard={engine.todaysCard}
             isLoading={engine.isOracleLoading}
