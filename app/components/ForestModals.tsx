@@ -2,9 +2,9 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, X, Lock, Palette, Unlock, Zap, Sparkles, Trash2, Quote, Pause, User, LogOut, Download, Share2, Settings2, Volume2, Square, Mic, Heart, Send, Flame, CloudRain, Wind, Trees, Sliders, Power, StopCircle, Play, Loader2, PenTool, Search } from 'lucide-react';
+import { Bell, X, Lock, Palette, Unlock, Zap, Sparkles, HelpCircle, Repeat, Eye, EyeOff, Gem, Trash2, Quote, Pause, User, LogOut, Download, Share2, Settings2, Volume2, Square, Mic, Heart, Send, Flame, CloudRain, Wind, Trees, Sliders, Power, StopCircle, Play, Loader2, PenTool, Search } from 'lucide-react';
 import Image from 'next/image';
-import { Artifact, ARTIFACTS, OracleCard, WhisperBottle, THEMES, ThemeId, SpiritFormType, SPIRIT_FORMS, DailyMood, EMOTION_COLORS } from '../types';
+import { Artifact, ARTIFACTS, WhisperBottle, THEMES, ThemeId, SpiritFormType, SPIRIT_FORMS, DailyMood, EMOTION_COLORS } from '../types';
 import { toPng } from 'html-to-image';
 import QRCode from 'react-qr-code';
 import { BurningPaperEffect,  SpiritWisp, SpiritFox } from './ForestVisuals'; 
@@ -21,110 +21,241 @@ const ModalOverlay = ({ children, onClose }: { children: React.ReactNode, onClos
     </motion.div>
 );
 
-// --- 1. Oracle Modal (Updated for html-to-image) ---
-export const OracleModal = ({ isOpen, card, onConfirm }: { isOpen: boolean; card: OracleCard | null; onConfirm: () => void }) => {
-    const cardRef = useRef<HTMLDivElement>(null);
-    const [isCapturing, setIsCapturing] = useState(false);
+// 4-1. Oracle Card Component (개별 카드)
+const OracleCard = ({ card, isFlipped, onClick, disabled }: any) => {
+    return (
+        <div 
+            className={`relative w-full aspect-[2/3] perspective-1000 ${disabled ? 'cursor-default' : 'cursor-pointer group'}`} 
+            onClick={() => !disabled && onClick()}
+        >
+            <motion.div
+                className="w-full h-full relative transition-transform duration-700 transform-style-3d"
+                animate={{ rotateY: isFlipped ? 180 : 0 }}
+                whileHover={!disabled && !isFlipped ? { scale: 1.02, y: -5 } : {}}
+            >
+                {/* Card Back (뒷면) */}
+                <OracleCardBack />
 
-    if (!isOpen || !card) return null;
+                {/* Card Front (앞면) */}
+                <OracleCardFront card={card} />
+            </motion.div>
+        </div>
+    );
+};
 
-    const handleDownload = async () => {
-        if (!cardRef.current) return;
-        setIsCapturing(true); 
+// 4-2. Oracle Card Back (고풍스러운 뒷면 디자인)
+const OracleCardBack = () => (
+    <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f0f1a] rounded-xl border-2 border-[#c5a47e]/50 shadow-2xl backface-hidden flex items-center justify-center overflow-hidden">
+        {/* 배경 패턴 */}
+        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/binding-dark.png')] mix-blend-overlay"></div>
+        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-[#c5a47e]/20 via-transparent to-transparent"></div>
         
-        try {
-            // 폰트 로딩 등 렌더링 확보를 위한 미세 딜레이
-            await new Promise(resolve => setTimeout(resolve, 100));
+        {/* 중앙 심볼 및 장식 */}
+        <div className="relative z-10 flex flex-col items-center">
+            <div className="p-4 rounded-full border-2 border-[#c5a47e]/50 bg-[#1a1a2e]/80 shadow-[0_0_20px_rgba(197,164,126,0.3)]">
+                <Gem size={40} className="text-[#c5a47e] animate-pulse-slow" />
+            </div>
+            <h3 className="text-[#c5a47e] font-serif text-sm mt-4 tracking-[0.2em] uppercase">Fate's Whisper</h3>
+            
+            {/* 테두리 장식 */}
+            <div className="absolute inset-2 border border-[#c5a47e]/20 rounded-lg pointer-events-none"></div>
+            <div className="absolute -inset-0.5 bg-gradient-to-br from-[#c5a47e]/20 to-transparent rounded-xl blur-sm -z-10 pointer-events-none"></div>
+        </div>
+    </div>
+);
 
-            // [Fix] html-to-image 사용 (oklab 에러 해결)
-            const dataUrl = await toPng(cardRef.current, {
-                cacheBust: true,
-                backgroundColor: '#0a0a0a', // 배경색 명시
-                pixelRatio: 2, // 고화질 설정
-            });
+// 4-3. Oracle Card Front (화려한 앞면 디자인)
+const OracleCardFront = ({ card }: any) => (
+    <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#0f0f1a] rounded-xl border-2 border-[#c5a47e] shadow-2xl backface-hidden rotate-y-180 overflow-hidden flex flex-col">
+        {/* 이미지 영역 (프레임 및 효과) */}
+        <div className="relative flex-1 m-2 rounded-lg overflow-hidden border border-[#c5a47e]/50 group">
+             {/* 금빛 프레임 장식 */}
+            <div className="absolute inset-0 pointer-events-none z-10 border-[6px] border-transparent border-image-[url('https://i.imgur.com/4qW4X8w.png')] 10% round mix-blend-overlay opacity-60"></div>
+             <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f1a] via-transparent to-transparent z-10 opacity-40"></div>
 
-            const link = document.createElement('a');
-            link.download = `bamboo-oracle-${new Date().toISOString().slice(0,10)}.png`;
-            link.href = dataUrl;
-            link.click();
-        } catch (err) {
-            console.error("Image generation failed:", err);
-            alert("이미지 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
-        } finally {
-            setIsCapturing(false);
+            {card ? (
+                <>
+                    <Image
+                        src={card.image_url}
+                        alt={card.name}
+                        fill
+                        className="object-cover transition-transform duration-1000 group-hover:scale-105"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    />
+                     {/* 빛 반사 효과 */}
+                     <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none mix-blend-overlay"></div>
+                </>
+            ) : (
+                // 로딩 중 표시
+                <div className="w-full h-full flex items-center justify-center bg-[#0a0a0a]">
+                    <Loader2 size={30} className="text-[#c5a47e] animate-spin" />
+                </div>
+            )}
+        </div>
+
+        {/* 텍스트 영역 */}
+        <div className="p-4 text-center relative z-20 bg-[#1a1a2e]/90 border-t border-[#c5a47e]/30">
+             {/* 텍스트 배경 장식 */}
+             <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/binding-dark.png')] mix-blend-overlay pointer-events-none"></div>
+
+            {card ? (
+                <>
+                    <h3 className="text-xl font-serif font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#e0c3a3] via-[#c5a47e] to-[#e0c3a3] mb-1 drop-shadow-sm">
+                        {card.name}
+                    </h3>
+                    <p className="text-xs text-[#c5a47e]/80 uppercase tracking-widest font-medium">
+                        {card.keywords}
+                    </p>
+                </>
+            ) : (
+                 <div className="h-12 flex items-center justify-center">
+                    <span className="text-[#c5a47e]/50 text-sm font-serif">Revealing fate...</span>
+                 </div>
+            )}
+        </div>
+    </div>
+);
+
+// 4-4. Main Modal Component
+export const OracleModal = ({ isOpen, onClose, onDrawCard, todaysCard, isLoading, error }: any) => {
+    const [isFlipped, setIsFlipped] = useState(false);
+    const [showInterpretation, setShowInterpretation] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && todaysCard) {
+            setIsFlipped(true); // 이미 뽑은 카드가 있으면 보여줌
+        } else {
+            setIsFlipped(false);
+            setShowInterpretation(false);
+        }
+    }, [isOpen, todaysCard]);
+
+    const handleCardClick = () => {
+        if (!todaysCard && !isLoading) {
+            onDrawCard(); // 카드 뽑기
+            setIsFlipped(true); // 뒤집기 애니메이션 시작 (로딩 중일 수 있음)
         }
     };
 
+    if (!isOpen) return null;
+
     return (
-        <ModalOverlay onClose={() => {}}>
-            <div className="bg-[#121212] border border-white/10 rounded-2xl overflow-hidden shadow-2xl relative">
-                <button 
-                    onClick={onConfirm} 
-                    className="absolute top-4 right-4 z-50 p-2 bg-black/50 rounded-full text-white/50 hover:text-white transition-colors"
+        <ModalOverlay onClose={onClose}>
+            {/* 배경 효과 강화 */}
+            <div className="absolute inset-0 bg-gradient-radial from-[#1a1a2e] via-[#0a0a0a] to-[#050505] opacity-90 -z-10"></div>
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 animate-pulse-slow -z-10 mix-blend-screen"></div>
+
+
+            <div className="relative w-full max-w-md p-6 flex flex-col items-center">
+                {/* Header */}
+                <div className="absolute top-4 right-4 z-20">
+                     <button onClick={onClose} className="p-2 rounded-full bg-[#1a1a2e]/50 border border-[#c5a47e]/30 text-[#c5a47e]/70 hover:text-[#c5a47e] hover:bg-[#c5a47e]/10 transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
+                
+                <motion.div 
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-center mb-8 relative z-10"
                 >
-                    <X size={20} />
-                </button>
+                    <h2 className="text-3xl font-serif font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#e0c3a3] via-[#c5a47e] to-[#e0c3a3] flex items-center justify-center gap-3 drop-shadow-lg">
+                        <Sparkles className="text-[#c5a47e]" size={24} />
+                        Daily Oracle
+                        <Sparkles className="text-[#c5a47e]" size={24} style={{ transform: 'scaleX(-1)' }} />
+                    </h2>
+                    <p className="text-[#c5a47e]/70 text-sm mt-2 font-serif italic">
+                        "오늘 당신에게 전하는 운명의 속삭임"
+                    </p>
+                </motion.div>
 
-                {/* Capture Area */}
-                <div ref={cardRef} className="relative p-8 flex flex-col items-center text-center bg-gradient-to-b from-[#1a1a1a] to-black min-h-[550px] justify-between">
-                    <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]" />
-                    <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-purple-500/20 to-transparent blur-3xl" />
+                {/* Error Message */}
+                {error && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6 p-4 bg-red-900/20 border border-red-500/30 rounded-xl text-red-200 text-center text-sm">
+                        <p className="flex items-center justify-center gap-2"><HelpCircle size={16} /> {error}</p>
+                        <button onClick={onDrawCard} className="mt-3 px-4 py-1.5 bg-red-500/20 hover:bg-red-500/30 rounded-full text-xs flex items-center justify-center gap-2 mx-auto transition-colors">
+                            <Repeat size={12} /> 다시 시도
+                        </button>
+                    </motion.div>
+                )}
 
-                    <div className="relative z-10 mt-4">
-                        <div className="flex items-center justify-center gap-2 mb-2 opacity-70">
-                            <Sparkles size={14} className="text-yellow-200" />
-                            <span className="text-[10px] uppercase tracking-[0.3em] text-yellow-100">Daily Oracle</span>
-                            <Sparkles size={14} className="text-yellow-200" />
-                        </div>
-                        <h2 className="text-2xl font-serif text-white/90 mb-1">{card.name}</h2>
-                        <p className="text-xs text-white/40 font-mono">{new Date().toLocaleDateString()}</p>
-                    </div>
-
-                    <div className="relative z-10 w-48 h-72 my-6 rounded-lg border border-white/10 shadow-[0_0_30px_rgba(255,255,255,0.05)] flex items-center justify-center bg-white/5 overflow-hidden group">
-                        <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/20 via-transparent to-blue-500/20 opacity-50" />
-                        <div className="text-center p-4">
-                            <p className="text-4xl mb-4 opacity-80">{card.icon === 'Coffee' ? '☕' : card.icon === 'Footprints' ? '👣' : card.icon === 'Sun' ? '☀️' : card.icon === 'Sparkles' ? '✨' : card.icon === 'Wind' ? '🍃' : card.icon === 'Sunrise' ? '🌅' : '💖'}</p>
-                            <p className="text-white/80 font-serif italic text-sm leading-relaxed word-keep-all">
-                                "{card.message}"
-                            </p>
-                        </div>
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_3s_infinite]" />
-                    </div>
-
-                    <div className="relative z-10 w-full flex items-end justify-between border-t border-white/10 pt-4 mt-2">
-                        <div className="text-left">
-                            <p className="text-xs text-white/60 font-bold tracking-wider">Bamboo Forest</p>
-                            <p className="text-[9px] text-white/30 mt-1">Listen to your soul.</p>
-                        </div>
-                        <div className="bg-white p-1 rounded-sm">
-                            <QRCode 
-                                value={typeof window !== 'undefined' ? window.location.origin : 'https://bamboo-forest.vercel.app'} 
-                                size={48} 
-                                fgColor="#000000" 
-                                bgColor="#ffffff" 
-                            />
-                        </div>
-                    </div>
+                {/* Card Area */}
+                <div className="w-64 mx-auto mb-8 relative z-10">
+                    <OracleCard 
+                        card={todaysCard} 
+                        isFlipped={isFlipped} 
+                        onClick={handleCardClick}
+                        disabled={isLoading || todaysCard} // 로딩 중이거나 이미 뽑았으면 클릭 방지
+                    />
+                    
+                    {/* 안내 문구 */}
+                    <AnimatePresence>
+                        {!isFlipped && !isLoading && !todaysCard && (
+                            <motion.p
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="text-[#c5a47e]/60 text-sm text-center mt-6 font-serif animate-pulse"
+                            >
+                                카드를 터치하여 오늘의 운세를 확인하세요.
+                            </motion.p>
+                        )}
+                         {isLoading && isFlipped && !todaysCard && (
+                            <motion.p
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="text-[#c5a47e]/60 text-sm text-center mt-6 font-serif flex items-center justify-center gap-2"
+                            >
+                                <Loader2 size={16} className="animate-spin" />
+                                정령이 카드를 고르는 중...
+                            </motion.p>
+                        )}
+                    </AnimatePresence>
                 </div>
 
-                <div className="p-4 bg-black/40 backdrop-blur-md border-t border-white/5 flex gap-3">
-                    <motion.button 
-                        whileTap={{ scale: 0.95 }}
-                        onClick={handleDownload}
-                        disabled={isCapturing}
-                        className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-white/90 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                    >
-                        {isCapturing ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Download size={16} />}
-                        Save Image
-                    </motion.button>
-                    <motion.button 
-                        whileTap={{ scale: 0.95 }}
-                        onClick={onConfirm}
-                        className="flex-1 py-3 bg-white text-black rounded-xl text-sm font-bold shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:bg-gray-200 transition-colors"
-                    >
-                        Accept
-                    </motion.button>
-                </div>
+                {/* Interpretation Area (해석) */}
+                <AnimatePresence>
+                    {todaysCard && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20, height: 0 }}
+                            animate={{ opacity: 1, y: 0, height: 'auto' }}
+                            exit={{ opacity: 0, y: 20, height: 0 }}
+                            transition={{ duration: 0.5, ease: "easeInOut" }}
+                            className="w-full overflow-hidden relative z-10"
+                        >
+                            {showInterpretation ? (
+                                <div className="bg-[#1a1a2e]/80 border border-[#c5a47e]/30 p-6 rounded-2xl shadow-inner relative overflow-hidden">
+                                     <div className="absolute inset-0 opacity-5 bg-[url('https://www.transparenttextures.com/patterns/binding-dark.png')] mix-blend-overlay pointer-events-none"></div>
+                                    <h3 className="text-[#c5a47e] font-serif font-bold mb-3 flex items-center gap-2">
+                                        <Sparkles size={16} /> 정령의 메시지
+                                    </h3>
+                                    <p className="text-[#e0c3a3]/90 text-sm leading-relaxed font-serif italic text-justify">
+                                        "{todaysCard.interpretation}"
+                                    </p>
+                                    <div className="mt-4 pt-4 border-t border-[#c5a47e]/20 text-center">
+                                         <p className="text-[#c5a47e]/60 text-xs mb-1">오늘의 행운 조언</p>
+                                        <p className="text-[#e0c3a3] text-sm font-medium font-serif">"{todaysCard.lucky_advice}"</p>
+                                    </div>
+                                    <button 
+                                        onClick={() => setShowInterpretation(false)}
+                                        className="absolute top-4 right-4 text-[#c5a47e]/50 hover:text-[#c5a47e] transition-colors"
+                                    >
+                                        <EyeOff size={18} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setShowInterpretation(true)}
+                                    className="w-full py-3 bg-[#1a1a2e]/60 hover:bg-[#1a1a2e]/80 border border-[#c5a47e]/30 hover:border-[#c5a47e]/50 rounded-xl text-[#c5a47e] flex items-center justify-center gap-2 transition-all group"
+                                >
+                                    <Eye size={18} className="group-hover:scale-110 transition-transform" />
+                                    <span className="font-serif">해석 보기 (Reveal Interpretation)</span>
+                                </button>
+                            )}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         </ModalOverlay>
     );

@@ -27,6 +27,7 @@ export const viewport: Viewport = {
 
 // [2] 메타데이터 (SEO & OG 태그)
 export const metadata: Metadata = {
+  metadataBase: new URL('https://bamboo-forest.vercel.app'),
   title: "Bamboo Forest | 마음의 쉼터",
   description: "지친 당신을 위한 AI 대나무 숲. 정령과 대화하며 마음을 치유하세요.",
   manifest: "/manifest.json", // PWA 연결

@@ -18,6 +18,8 @@ const DAILY_QUOTES = [
   "가장 깊은 밤이 지나야 새벽이 온다.", "너의 속도로 걸어가도 돼."
 ];
 
+import { ORACLE_DECK } from '../types';
+
 export function useBambooEngine() {
   const { user, isPremium, signInWithGoogle, signOut } = useAuth();
   const { triggerSuccess, triggerMedium, triggerLight, triggerBreathing } = useHaptic();  
@@ -51,6 +53,7 @@ export function useBambooEngine() {
   const [showBottleMenu, setShowBottleMenu] = useState(false); // 메뉴 (쓰기 vs 줍기)
   const [showBottleWrite, setShowBottleWrite] = useState(false); // 쓰기 모달
   const [foundBottle, setFoundBottle] = useState<any>(null); // 읽기 모달 (데이터 있으면 열림)
+  
   // Helper: 유리병 줍기 액션
   const handlePickUp = async () => {
     const bottle = await soul.pickUpBottle();
@@ -65,6 +68,23 @@ export function useBambooEngine() {
       setSoulographyType(type);
       setSoulographyData(data);
       setShowSoulography(true);
+  };
+  // [New] Oracle States
+  const [todaysCard, setTodaysCard] = useState<any>(null);
+  const [isOracleLoading, setIsOracleLoading] = useState(false);
+  // [New] 카드 뽑기 함수
+  const drawOracleCard = () => {
+    if (todaysCard) return; // 이미 뽑았으면 중복 방지 (선택 사항)
+    
+    setIsOracleLoading(true);
+    
+    // 신비로운 느낌을 위해 1.5초 딜레이 후 결과 공개
+    setTimeout(() => {
+        const randomIndex = Math.floor(Math.random() * ORACLE_DECK.length);
+        const pickedCard = ORACLE_DECK[randomIndex];
+        setTodaysCard(pickedCard);
+        setIsOracleLoading(false);
+    }, 1500);
   };
 
   const voice = useSpiritVapi(user?.id ?? null, handleCallEnd, handleEmotionDetected);
@@ -132,6 +152,23 @@ export function useBambooEngine() {
   
   const [bgVolume, setBgVolume] = useState(0.5);
   const [voiceVolume, setVoiceVolume] = useState(1.0);
+  const [showGuide, setShowGuide] = useState(false);
+  // [New] Check First Visit (useEffect)
+  useEffect(() => {
+    // localStorage에서 확인
+    const hasSeenGuide = localStorage.getItem('has_seen_guide_v1');
+    if (!hasSeenGuide) {
+        // 잠시 후(1초) 가이드 시작 (로딩 등을 고려)
+        const timer = setTimeout(() => setShowGuide(true), 1000);
+        return () => clearTimeout(timer);
+  }
+  }, []);
+
+  // [New] Complete Handler
+  const completeGuide = () => {
+    setShowGuide(false);
+    localStorage.setItem('has_seen_guide_v1', 'true'); // 봤다고 기록
+  };
 
   const { 
     playPaperRustle, 
@@ -444,7 +481,7 @@ export function useBambooEngine() {
       isHolding, setIsHolding, handlePet,
       letters: soul.letters, generateMonthlyLetter: soul.generateMonthlyLetter, saveVoiceCapsule: soul.saveVoiceCapsule, generateWeeklyReport: soul.generateWeeklyReport,
       sleepTimer, startSleepTimer, stopSleepTimer, playIntroBoom,
-      todaysCard: soul.todaysCard, showOracleModal: soul.showOracleModal, confirmOracle: soul.confirmOracle,
+      showOracleModal: soul.showOracleModal, confirmOracle: soul.confirmOracle,
       fireflies, broadcastTouch,
       // [Fix] Export Bottle Functions
       sendBottle: soul.sendBottle, 
@@ -482,6 +519,9 @@ export function useBambooEngine() {
       pickUpBottle: soul.pickUpBottle,
       sendWarmth: soul.sendWarmth,
       castBottle: soul.castBottle,
-
+      showGuide, completeGuide,
+      todaysCard,
+      isOracleLoading,
+      drawOracleCard,
   };
 }

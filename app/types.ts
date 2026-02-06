@@ -71,12 +71,13 @@ export interface Memory {
   is_capsule?: boolean;
 }
 
-// [New] Oracle Card Definition
+// 👇 [New] OracleCard 인터페이스 추가
 export interface OracleCard {
-    id: string;
-    message: string;
-    name: string;
-    icon: string; 
+  name: string;
+  image_url: string;
+  keywords: string;
+  interpretation: string;
+  lucky_advice: string;
 }
 
 // [New] Whisper Bottle Definition
@@ -93,13 +94,62 @@ export interface WhisperBottle {
 }
 
 export const ORACLE_DECK: OracleCard[] = [
-    { id: '1', name: '쉼', message: "가끔은 멈춰 서야 비로소 보이는 것들이 있어.", icon: "Coffee" },
-    { id: '2', name: '용기', message: "네가 내딛는 그 작은 한 걸음이 곧 길이야.", icon: "Footprints" },
-    { id: '3', name: '위로', message: "괜찮아, 그림자가 있다는 건 빛이 있다는 증거니까.", icon: "Sun" },
-    { id: '4', name: '기억', message: "가장 행복했던 순간을 떠올려볼까?", icon: "Sparkles" },
-    { id: '5', name: '놓아줌', message: "꽉 쥔 손을 펴야 새로운 것을 잡을 수 있어.", icon: "Wind" },
-    { id: '6', name: '시작', message: "늦지 않았어. 바로 지금이 가장 빠른 때야.", icon: "Sunrise" },
-    { id: '7', name: '자존감', message: "너는 존재만으로도 충분히 사랑받을 가치가 있어.", icon: "Heart" },
+  { 
+      name: '쉼 (Rest)', 
+      image_url: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?q=80&w=1000&auto=format&fit=crop', // 고요한 숲/자연
+      keywords: '휴식, 재충전, 내면의 평화',
+      interpretation: "지금은 잠시 멈추어 숨을 고를 때입니다. 쉼은 시간 낭비가 아니라, 더 멀리 나아가기 위한 도약의 준비입니다. 소란스러운 세상의 소리를 끄고, 당신 내면의 고요한 목소리에 귀를 기울이세요.",
+      lucky_advice: "따뜻한 차 한 잔을 마시며 5분간 멍하니 창밖을 바라보세요."
+  },
+  { 
+      name: '용기 (Courage)', 
+      image_url: 'https://images.unsplash.com/photo-1528164344705-4754268798dd?q=80&w=1000&auto=format&fit=crop', // 여명/일출
+      keywords: '도전, 자신감, 첫걸음',
+      interpretation: "두려움은 당신이 성장하고 있다는 증거입니다. 거창한 계획보다 중요한 것은 지금 당장의 작은 실천입니다. 당신이 내딛는 그 작은 한 걸음이 곧 길이 될 것입니다. 스스로를 믿고 나아가세요.",
+      lucky_advice: "오늘 망설였던 일 중 가장 작은 것 하나를 지금 바로 저질러보세요."
+  },
+  { 
+      name: '위로 (Comfort)', 
+      image_url: 'https://images.unsplash.com/photo-1504194569480-165eb3d1dc3f?q=80&w=1000&auto=format&fit=crop', // 따뜻한 햇살
+      keywords: '치유, 희망, 따스함',
+      interpretation: "괜찮습니다. 그림자가 있다는 건 근처에 빛이 있다는 증거니까요. 당신의 슬픔은 곧 아물 것이며, 그 상처 자리에는 더 단단하고 아름다운 새살이 돋아날 것입니다. 오늘은 당신 자신에게 조금 더 관대해지세요.",
+      lucky_advice: "좋아하는 음악을 들으며 스스로를 꼭 안아주세요."
+  },
+  { 
+      name: '기억 (Memory)', 
+      image_url: 'https://images.unsplash.com/photo-1501619583091-c27c699042b0?q=80&w=1000&auto=format&fit=crop', // 반짝이는 빛/추억
+      keywords: '회상, 소중함, 그리움',
+      interpretation: "과거의 행복했던 기억은 당신을 지키는 든든한 방패입니다. 힘들고 지칠 때 꺼내 볼 수 있는 보석 같은 순간들을 소중히 간직하세요. 그 기억들이 오늘의 당신을 지탱하는 힘이 되어줄 것입니다.",
+      lucky_advice: "사진첩을 열어 가장 행복하게 웃고 있는 당신의 사진을 찾아보세요."
+  },
+  { 
+      name: '놓아줌 (Release)', 
+      image_url: '/images/oracle/card-rest.png',
+      keywords: '해방, 비움, 자유',
+      interpretation: "꽉 쥔 손을 펴야 새로운 것을 잡을 수 있습니다. 집착하고 있는 고민이나 관계가 있다면 바람에 실어 보내세요. 빈 손이 되어야 비로소 더 값지고 새로운 기회가 찾아옵니다. 흐르는 물처럼 유연해지세요.",
+      lucky_advice: "책상 위나 가방 속의 불필요한 물건을 하나 정리하여 버리세요."
+  },
+  { 
+      name: '시작 (Beginnings)', 
+      image_url: 'https://images.unsplash.com/photo-1496661415325-ef852f9e8e7c?q=80&w=1000&auto=format&fit=crop', // 새싹/초록
+      keywords: '기회, 가능성, 새출발',
+      interpretation: "늦지 않았습니다. 당신의 이야기는 매일 아침 새롭게 쓰입니다. 과거에 얽매이지 마세요. 바로 지금 이 순간이 당신의 남은 인생에서 가장 젊고, 가능성으로 가득 찬 때입니다.",
+      lucky_advice: "평소와 다른 길로 산책하거나, 새로운 메뉴를 주문해보세요."
+  },
+  { 
+      name: '자존감 (Self-Love)', 
+      image_url: 'https://images.unsplash.com/photo-1516575150278-77136aed6920?q=80&w=1000&auto=format&fit=crop', // 하트/거울/자신
+      keywords: '사랑, 가치, 존중',
+      interpretation: "타인의 시선으로 당신을 정의하지 마세요. 당신은 우주에서 유일무이한 존재입니다. 당신은 어떤 성과를 내서가 아니라, 존재하는 그 자체만으로도 충분히 사랑받고 존중받을 가치가 있습니다.",
+      lucky_advice: "거울을 보고 눈을 맞추며 '나는 꽤 괜찮은 사람이야'라고 말해주세요."
+  },
+  {
+      name: '직관 (Intuition)',
+      image_url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1000&auto=format&fit=crop', // 밤하늘/달/신비
+      keywords: '지혜, 통찰, 내면의 눈',
+      interpretation: "논리적인 생각보다 당신의 직감을 믿으세요. 마음속 깊은 곳에서 울리는 작은 목소리가 정답을 알고 있습니다. 안개가 걷히고 곧 명확한 길이 보일 것입니다.",
+      lucky_advice: "오늘 하루는 고민하지 말고, 처음에 든 생각대로 행동해보세요."
+  }
 ];
 
 export const TIME_THEMES = {

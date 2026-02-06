@@ -10,6 +10,7 @@ import { useRipple } from './hooks/useRipple';
 import { Memory, WeatherType, Particle, THEMES } from './types';
 import { getMoonPhase, getMoonIconPath } from './utils/moonPhase';
 import { InstallPrompt } from './components/InstallPrompt';
+import { ForestGuide } from './components/ForestGuide';
 
 // Components
 import { ForestBackground, SpringPetal, SummerFirefly, AutumnLeaf, ConstellationLayer, OrbitLayer, MemoryFlower, GoldenCocoon, FireflyLayer, SoulTree, FloatingBottle, SpiritWisp, SpiritFox, SpiritGuardian } from './components/ForestVisuals';
@@ -382,8 +383,16 @@ export default function BambooForest() {
         </ForestBackground>
 
         {/* --- MODALS --- */}
-        <OracleModal isOpen={engine.showOracleModal} card={engine.todaysCard} onConfirm={engine.confirmOracle} />
-        
+        {/* 👇 DailyOracleModal 연결 수정 */}
+        <OracleModal 
+            isOpen={engine.showOracleModal} // 혹은 engine.showDailyOracle (본인 state 이름 확인)
+            onClose={() => engine.confirmOracle()} // 닫기 함수
+            
+            // [Fix] 여기가 비어 있어서 에러가 났던 것입니다.
+            onDrawCard={engine.drawOracleCard} 
+            todaysCard={engine.todaysCard}
+            isLoading={engine.isOracleLoading}
+        />        
         <SettingsModal 
             isOpen={engine.showSettings} 
             onClose={() => engine.setShowSettings(false)} 
@@ -446,6 +455,11 @@ export default function BambooForest() {
             isOpen={engine.showMemoryRitual} onClose={() => engine.setShowMemoryRitual(false)} 
             user={user} isPremium={isPremium} onFinalize={engine.finalizeMemory} onSaveCapsule={engine.saveVoiceCapsule} 
         />
+
+        {/* [New] The Guide */}
+        {engine.showGuide && (
+                <ForestGuide onComplete={engine.completeGuide} />
+            )}
 
         {/* 1. 메뉴 모달 (띄우기 vs 줍기) */}
         <BottleMenuModal 
