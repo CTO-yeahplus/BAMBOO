@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, X, Lock, Palette, Unlock, Zap, Sparkles, Trash2, Pause, User, LogOut, Download, Share2, Settings2, Volume2, Square, Mic, Heart, Send, Flame, CloudRain, Wind, Trees, Sliders, Power, StopCircle, Play, Loader2 } from 'lucide-react';
+import { Bell, X, Lock, Palette, Unlock, Zap, Sparkles, Trash2, Quote, Pause, User, LogOut, Download, Share2, Settings2, Volume2, Square, Mic, Heart, Send, Flame, CloudRain, Wind, Trees, Sliders, Power, StopCircle, Play, Loader2, PenTool, Search } from 'lucide-react';
 import Image from 'next/image';
 import { Artifact, ARTIFACTS, OracleCard, WhisperBottle, THEMES, ThemeId, SpiritFormType, SPIRIT_FORMS, DailyMood, EMOTION_COLORS } from '../types';
 import { toPng } from 'html-to-image';
@@ -514,129 +514,6 @@ export const BottleWriteModal = ({ isOpen, onClose, onSend }: any) => {
     );
 };
 
-// --- 6. Bottle Read Modal (녹음 기능 완벽 구현됨) ---
-export const BottleReadModal = ({ bottle, onClose, onLike, onReply, isPremium, onShare }: { bottle: WhisperBottle | null, onClose: () => void, onLike: (id: number) => void, onReply: (id: number, blob: Blob) => void, isPremium: boolean,onShare: (type: 'letter', data: any) => void }) => {
-    // [Fix] 녹음 관련 상태와 로직 추가
-    const [isRecording, setIsRecording] = useState(false);
-    const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const chunksRef = useRef<Blob[]>([]);
-
-    const startRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorderRef.current = new MediaRecorder(stream);
-            chunksRef.current = [];
-
-            mediaRecorderRef.current.ondataavailable = (e) => {
-                if (e.data.size > 0) chunksRef.current.push(e.data);
-            };
-
-            mediaRecorderRef.current.onstop = () => {
-                const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-                setAudioBlob(blob);
-            };
-
-            mediaRecorderRef.current.start();
-            setIsRecording(true);
-        } catch (e) {
-            alert("마이크 권한이 필요합니다.");
-        }
-    };
-
-    const stopRecording = () => {
-        if (mediaRecorderRef.current && isRecording) {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-        }
-    };
-
-    if (!bottle) return null;
-
-    return (
-        <ModalOverlay onClose={() => {
-            // 모달 닫을 때 녹음 데이터 초기화
-            setAudioBlob(null);
-            setIsRecording(false);
-            onClose();
-        }}>
-            <div className="relative bg-[#0c0c0c] border border-[#222] p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center overflow-hidden">
-                <div className="absolute inset-0 bg-blue-900/10" />
-                <div className="absolute bottom-0 inset-x-0 h-1/2 bg-gradient-to-t from-blue-500/10 to-transparent pointer-events-none" />
-                
-                <div className="relative z-10">
-                    {/* Bottle Icon */}
-                    <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]">
-                        {bottle.is_distress ? <span className="text-2xl animate-pulse">🆘</span> : <span className="text-2xl">🍾</span>}
-                    </div>
-                    
-                    {/* Content */}
-                    <p className="text-white/80 font-serif italic text-lg leading-relaxed mb-8 break-keep">
-                        "{bottle.content}"
-                    </p>
-                    
-                    {/* [New] Guardian Reply UI */}
-                    {isPremium && !bottle.reply_audio_url && (
-                        <div className="mb-8 p-4 bg-white/5 rounded-xl border border-white/5">
-                            <p className="text-[10px] text-yellow-500/70 uppercase tracking-widest mb-3">Guardian's Duty</p>
-                            
-                            {!audioBlob ? (
-                                // 1. 녹음 버튼
-                                <div className="flex flex-col items-center gap-2">
-                                    <button 
-                                        onClick={isRecording ? stopRecording : startRecording}
-                                        className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all ${isRecording ? 'bg-red-500/20 border-red-500 text-red-500 animate-pulse' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white'}`}
-                                    >
-                                        {isRecording ? <Square size={16} fill="currentColor" /> : <Mic size={20} />}
-                                    </button>
-                                    <span className="text-[10px] text-white/30">{isRecording ? "Recording..." : "Reply with Voice"}</span>
-                                </div>
-                            ) : (
-                                // 2. 전송/삭제 버튼
-                                <div className="flex items-center justify-center gap-3">
-                                    <button 
-                                        onClick={() => onReply(bottle.id, audioBlob)}
-                                        className="px-4 py-2 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-200 text-xs rounded-full border border-yellow-500/30 flex items-center gap-2 transition-all"
-                                    >
-                                        <Send size={12} /> 답장 보내기
-                                    </button>
-                                    <button onClick={() => setAudioBlob(null)} className="p-2 text-white/30 hover:text-red-400 transition-colors">
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    {/* [New] Share Button (텍스트 바로 아래 배치) */}
-                    <div className="mb-6 flex justify-center">
-                        <button 
-                            onClick={() => onShare('letter', bottle)}
-                            className="text-[10px] text-white/30 hover:text-purple-300 flex items-center gap-1 transition-colors tracking-wider uppercase"
-                        >
-                            <Share2 size={10} /> Share this whisper
-                        </button>
-                    </div>
-
-                    {/* Footer Actions */}
-                    <div className="flex justify-center gap-4">
-                        <button onClick={onClose} className="px-6 py-2 rounded-full border border-white/10 text-white/40 hover:bg-white/5 text-xs transition-colors">닫기</button>
-                        <button 
-                            onClick={() => { onLike(bottle.id); onClose(); }} 
-                            className="px-6 py-2 bg-red-500/10 border border-red-500/20 text-red-300 hover:bg-red-500/20 rounded-full text-xs flex items-center gap-2 transition-all group"
-                        >
-                            <Heart size={12} className="group-hover:fill-red-300 transition-all" /> 
-                            따뜻해요 {bottle.likes}
-                        </button>
-                    </div>
-                    
-                    <p className="mt-6 text-[9px] text-white/20 uppercase tracking-widest">Someone's Whisper • {new Date(bottle.created_at).toLocaleDateString()}</p>
-                </div>
-            </div>
-        </ModalOverlay>
-    );
-};
-
 // [New] Fire Ritual Modal (번제 의식)
 export const FireRitualModal = ({ isOpen, onClose, onBurn }: any) => {
     const [text, setText] = useState("");
@@ -985,6 +862,113 @@ export const SpiritCapsuleModal = ({ isOpen, onClose, capsules, onDelete }: any)
                         ))
                     )}
                 </div>
+            </div>
+        </ModalOverlay>
+    );
+};
+
+
+// 1. [BottleMenu] 선택 화면: "띄울까, 주을까?"
+export const BottleMenuModal = ({ isOpen, onClose, onWrite, onPickUp }: any) => {
+    if (!isOpen) return null;
+    return (
+        <ModalOverlay onClose={onClose}>
+            <div className="bg-[#0a0a0a] border border-white/10 p-8 rounded-2xl max-w-sm w-full text-center relative overflow-hidden">
+                {/* 배경 효과 */}
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500" />
+                
+                <h3 className="text-xl font-serif text-white/90 mb-2 italic">Echo of Souls</h3>
+                <p className="text-xs text-white/40 mb-8 leading-relaxed">
+                    이 바다에는 수많은 영혼들의 속삭임이 떠다닙니다.<br/>
+                    당신의 이야기를 띄우거나, 누군가의 목소리를 들어보세요.
+                </p>
+
+                <div className="space-y-3">
+                    <button onClick={onWrite} className="w-full py-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all flex items-center justify-center gap-3 group">
+                        <PenTool size={18} className="text-blue-300 group-hover:scale-110 transition-transform" />
+                        <span className="text-white/80 text-sm">이야기 띄우기</span>
+                    </button>
+                    <button onClick={onPickUp} className="w-full py-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all flex items-center justify-center gap-3 group">
+                        <Search size={18} className="text-purple-300 group-hover:scale-110 transition-transform" />
+                        <span className="text-white/80 text-sm">유리병 찾기</span>
+                    </button>
+                </div>
+            </div>
+        </ModalOverlay>
+    );
+};
+
+// --- 6. Bottle Read Modal (읽기 전용) ---
+export const BottleReadModal = ({ isOpen, onClose, bottle, onSendWarmth }: any) => {
+    const [hasSentWarmth, setHasSentWarmth] = useState(false);
+
+    // 모달이 열릴 때마다 상태 초기화
+    useEffect(() => {
+        if (isOpen) setHasSentWarmth(false);
+    }, [isOpen, bottle]);
+
+    if (!isOpen || !bottle) return null;
+
+    const handleWarmth = () => {
+        if (hasSentWarmth) return;
+        onSendWarmth(bottle.id, bottle.likes || 0);
+        setHasSentWarmth(true);
+        // (선택사항) 온기를 보내고 잠시 후 자동으로 닫으려면 아래 주석 해제
+        // setTimeout(() => onClose(), 2000); 
+    };
+
+    return (
+        <ModalOverlay onClose={onClose}>
+            <div className="bg-[#1a1a1a] border border-white/10 p-6 rounded-2xl shadow-2xl w-full max-w-md relative overflow-hidden">
+                
+                {/* [Header] */}
+                <div className="flex justify-between items-start mb-6">
+                    <div>
+                        <h2 className="text-white/90 text-lg font-serif italic">Message from the Sea</h2>
+                        <p className="text-[10px] text-white/40 uppercase tracking-widest mt-1">
+                            {new Date(bottle.created_at).toLocaleDateString()} • Anonymous
+                        </p>
+                    </div>
+                    <button onClick={onClose}><X className="text-white/30 hover:text-white" /></button>
+                </div>
+
+                {/* [Distress Indicator] 구조 신호일 경우 표시 */}
+                {bottle.is_distress && (
+                    <div className="mb-4 flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                        <div className="p-1.5 rounded-full bg-red-500/20 text-red-200 animate-pulse">
+                            <Sparkles size={14} />
+                        </div>
+                        <span className="text-xs text-red-200 font-medium">구조 신호가 감지되었습니다.</span>
+                    </div>
+                )}
+
+                {/* [Content Area] */}
+                <div className="bg-black/20 border border-white/5 rounded-xl p-6 mb-6 relative min-h-[140px] flex flex-col justify-center">
+                    <Quote className="absolute top-4 left-4 text-white/10" size={24} />
+                    <p className="text-white/90 text-sm font-serif leading-loose text-center italic relative z-10 whitespace-pre-wrap">
+                        "{bottle.content}"
+                    </p>
+                    <Quote className="absolute bottom-4 right-4 text-white/10 rotate-180" size={24} />
+                </div>
+
+                {/* [Actions] */}
+                <div className="flex justify-center">
+                    {hasSentWarmth ? (
+                        <div className="px-6 py-3 rounded-full bg-pink-500/10 border border-pink-500/20 text-pink-300 text-xs flex items-center gap-2 animate-fade-in cursor-default">
+                            <Heart size={16} fill="currentColor" />
+                            <span>따뜻한 온기가 전해졌습니다.</span>
+                        </div>
+                    ) : (
+                        <button 
+                            onClick={handleWarmth}
+                            className="group px-6 py-3 bg-white/5 hover:bg-pink-500/20 border border-white/10 hover:border-pink-500/30 rounded-full text-xs text-white/60 hover:text-pink-200 transition-all flex items-center gap-2"
+                        >
+                            <Heart size={16} className="group-hover:scale-110 transition-transform group-hover:text-pink-400" />
+                            <span>따뜻한 마음 전하기 (Send Warmth)</span>
+                        </button>
+                    )}
+                </div>
+
             </div>
         </ModalOverlay>
     );

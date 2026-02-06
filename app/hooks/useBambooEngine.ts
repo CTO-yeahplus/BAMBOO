@@ -47,6 +47,20 @@ export function useBambooEngine() {
   const [soulographyData, setSoulographyData] = useState<any>(null);
   const { permission, requestPermission } = usePushNotification();
 
+  // [New] Bottle UI States
+  const [showBottleMenu, setShowBottleMenu] = useState(false); // 메뉴 (쓰기 vs 줍기)
+  const [showBottleWrite, setShowBottleWrite] = useState(false); // 쓰기 모달
+  const [foundBottle, setFoundBottle] = useState<any>(null); // 읽기 모달 (데이터 있으면 열림)
+  // Helper: 유리병 줍기 액션
+  const handlePickUp = async () => {
+    const bottle = await soul.pickUpBottle();
+    if (bottle) {
+        setFoundBottle(bottle);
+        setShowBottleMenu(false); // 메뉴 닫기
+    } else {
+        alert("지금은 해변에 떠밀려온 유리병이 없습니다.\n직접 이야기를 띄워보시겠어요?");
+    }
+  };
   const openSoulography = (type: 'calendar' | 'letter', data: any) => {
       setSoulographyType(type);
       setSoulographyData(data);
@@ -459,7 +473,15 @@ export function useBambooEngine() {
       spiritCapsules: soul.spiritCapsules,
       keepSpiritVoice: soul.keepSpiritVoice,
       forgetSpiritVoice: soul.forgetSpiritVoice,
-      
       showSpiritCapsules, setShowSpiritCapsules,
+
+      // Bottle UI States & Handlers
+      showBottleMenu, setShowBottleMenu,
+      showBottleWrite, setShowBottleWrite,
+      handlePickUp,
+      pickUpBottle: soul.pickUpBottle,
+      sendWarmth: soul.sendWarmth,
+      castBottle: soul.castBottle,
+
   };
 }

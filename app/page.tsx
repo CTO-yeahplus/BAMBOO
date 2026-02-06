@@ -13,7 +13,7 @@ import { InstallPrompt } from './components/InstallPrompt';
 
 // Components
 import { ForestBackground, SpringPetal, SummerFirefly, AutumnLeaf, ConstellationLayer, OrbitLayer, MemoryFlower, GoldenCocoon, FireflyLayer, SoulTree, FloatingBottle, SpiritWisp, SpiritFox, SpiritGuardian } from './components/ForestVisuals';
-import { OracleModal, SettingsModal, AltarModal, ProfileModal, BottleWriteModal, BottleReadModal, FireRitualModal, SoulCalendarModal } from './components/ForestModals';
+import { OracleModal, SettingsModal, AltarModal, ProfileModal, BottleMenuModal, BottleWriteModal, BottleReadModal, FireRitualModal, SoulCalendarModal } from './components/ForestModals';
 import { MemoryRitual } from './components/MemoryRitual';
 import { TimeCapsuleModal } from './components/TimeCapsuleModal';
 import { SoulographyModal } from './components/ForestModals';
@@ -308,7 +308,8 @@ export default function BambooForest() {
                   hasCollectedDew={engine.hasCollectedDew}
                   onCollectDew={engine.collectDew}
                   onOpenFire={() => setShowFireRitual(true)}
-                  onOpenBottle={() => setShowWriteBottle(true)}
+                  //onOpenBottle={() => setShowWriteBottle(true)}
+                  onOpenBottle={() => engine.setShowBottleMenu(true)}
                   onOpenCapsule={() => setShowCapsuleModal(true)}
                   onOpenGallery={() => engine.setShowGalleryModal(true)}
                   onOpenCalendar={() => engine.setShowCalendar(true)}
@@ -445,6 +446,34 @@ export default function BambooForest() {
             isOpen={engine.showMemoryRitual} onClose={() => engine.setShowMemoryRitual(false)} 
             user={user} isPremium={isPremium} onFinalize={engine.finalizeMemory} onSaveCapsule={engine.saveVoiceCapsule} 
         />
+
+        {/* 1. 메뉴 모달 (띄우기 vs 줍기) */}
+        <BottleMenuModal 
+                isOpen={engine.showBottleMenu}
+                onClose={() => engine.setShowBottleMenu(false)}
+                onWrite={() => {
+                    engine.setShowBottleMenu(false);
+                    engine.setShowBottleWrite(true);
+                }}
+                onPickUp={engine.handlePickUp} // 줍기 로직 실행
+            />
+
+            {/* 2. 쓰기 모달 */}
+            <BottleWriteModal
+                isOpen={engine.showBottleWrite}
+                onClose={() => engine.setShowBottleWrite(false)}
+                onSend={engine.castBottle}
+            />
+
+            {/* 3. 읽기 모달 (foundBottle 데이터가 있을 때만 렌더링) */}
+            {engine.foundBottle && (
+                <BottleReadModal
+                    isOpen={true}
+                    bottle={engine.foundBottle}
+                    onClose={() => engine.setFoundBottle(null)} // 닫으면 상태 초기화
+                    onSendWarmth={engine.sendWarmth}
+                />
+            )}
 
         {/* [New] Soulography Modal */}
         <SoulographyModal 

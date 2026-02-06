@@ -9,6 +9,30 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// [New] 유리병 줍기 함수
+const pickUpBottle = async () => {
+    try {
+        // 방금 만든 DB 함수(rpc) 호출
+        const { data, error } = await supabase.rpc('get_random_bottle');
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+            // 성공: 1개의 유리병을 건짐
+            const bottle = data[0];
+            console.log("🌊 Found a bottle:", bottle);
+            return bottle; // 모달을 띄우기 위해 반환
+        } else {
+            // 실패: 조건에 맞는 유리병이 없음
+            alert("파도에 떠밀려온 유리병이 없습니다. 잠시 후 다시 시도해보세요.");
+            return null;
+        }
+    } catch (err) {
+        console.error("Bottle Pickup Error:", err);
+        return null;
+    }
+};
+
 export interface SoulLetter {
     id: number;
     month: string;
@@ -65,6 +89,58 @@ export function useSoulData(user: any, triggerSuccess: () => void, isPremium: bo
       setShowOracleModal(false);
       triggerSuccess(); 
       addResonance(30); 
+  };
+
+  // [New] 1. 유리병 띄우기 (Write)
+  const castBottle = async (content: string) => {
+    if (!user) return;
+    try {
+        const { error } = await supabase
+            .from('whisper_bottles')
+            .insert({
+                user_id: user.id,
+                content: content,
+                likes: 0
+            });
+        if (error) throw error;
+        alert("유리병이 파도에 실려 먼 바다로 떠났습니다.");
+    } catch (err) {
+        console.error(err);
+        alert("유리병을 띄우는데 실패했습니다.");
+    }
+  };
+
+  // [New] 2. 유리병 줍기 (Read)
+  const pickUpBottle = async () => {
+    if (!user) return null;
+    try {
+        // 아까 만든 DB 함수(RPC) 호출
+        const { data, error } = await supabase.rpc('get_random_bottle');
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+            return data[0]; // 찾은 유리병 데이터 반환
+        } else {
+            return null; // 바다가 고요함
+        }
+    } catch (err) {
+        console.error("Bottle Pickup Error:", err);
+        return null;
+    }
+  };
+
+  // [New] 3. 온기 보내기 (Like)
+  const sendWarmth = async (bottleId: number, currentLikes: number) => {
+    try {
+        const { error } = await supabase
+            .from('whisper_bottles')
+            .update({ likes: currentLikes + 1 })
+            .eq('id', bottleId);
+        if (error) throw error;
+    } catch (err) {
+        console.error("Warmth Error:", err);
+    }
   };
 
   // [New] Spirit Capsules State (정령의 목소리 보관함)
@@ -345,6 +421,6 @@ export function useSoulData(user: any, triggerSuccess: () => void, isPremium: bo
       spiritForm, changeSpiritForm, SPIRIT_FORMS,showGalleryModal, setShowGalleryModal,
       monthlyMoods, fetchMonthlyMoods, spiritCapsules,      // 정령 보관함 데이터
       keepSpiritVoice,     // 정령 저장 함수
-      forgetSpiritVoice,
+      forgetSpiritVoice, castBottle, pickUpBottle, sendWarmth,
   };
 }
