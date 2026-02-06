@@ -22,10 +22,8 @@ export function useBambooEngine() {
   const { triggerSuccess, triggerMedium, triggerLight, triggerBreathing } = useHaptic();  
   const soul = useSoulData(user, triggerSuccess, isPremium);
   const [showFireRitual, setShowFireRitual] = useState(false);
-  
   const [weather, setWeather] = useState<WeatherType>('clear');
   const [selectedAmbience, setSelectedAmbience] = useState<WeatherType | null>(null);
-
   const handleEmotionDetected = useCallback((detectedWeather: WeatherType) => {
       setWeather((prev) => {
           if (prev !== detectedWeather) {
@@ -107,7 +105,7 @@ export function useBambooEngine() {
   const [bgVolume, setBgVolume] = useState(0.5);
   const [voiceVolume, setVoiceVolume] = useState(1.0);
 
-const { 
+  const { 
     playPaperRustle, 
     playMagicDust, 
     playWindChime, 
@@ -119,8 +117,9 @@ const {
     setIsMixerMode, 
     mixerVolumes, 
     setMixerVolumes, 
-    applyPreset
-} = useSoundEngine(selectedAmbience, bgVolume); // <--- [Fix] 여기에 인자를 넣어주세요!
+    applyPreset,
+    binauralMode, setBinauralMode
+  } = useSoundEngine(selectedAmbience, bgVolume); // <--- [Fix] 여기에 인자를 넣어주세요!
 
   // [New] Mobile Audio Warm-up
   const startExperience = useCallback(() => {
@@ -204,6 +203,19 @@ const {
       setSleepTimer(null);
       setInitialSleepTime(null);
   }, []);
+
+  
+  // [New] Calendar State
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
+
+  // 캘린더 열릴 때 데이터 로드
+  useEffect(() => {
+      if (showCalendar) {
+          soul.fetchMonthlyMoods(calYear, calMonth);
+      }
+  }, [showCalendar, calYear, calMonth, soul.fetchMonthlyMoods]); // soul 객체가 dependency에 들어가면 무한루프 가능성 -> fetchMonthlyMoods만
 
   useEffect(() => {
       if (sleepTimer === null) return;
@@ -375,7 +387,7 @@ const {
       backgroundGradient, weather, isDaytime, showEasterEgg, bgVolume, setBgVolume, voiceVolume, setVoiceVolume, selectedAmbience, changeAmbience, season,
       playPaperRustle, playMagicDust, initAudio, triggerLight, motionValues, audioRefs, finalizeMemory, deleteMemory, shareMemory, capturingId: null, isDeleting: null,
       isHolding, setIsHolding, handlePet,
-      letters: soul.letters, generateMonthlyLetter: soul.generateMonthlyLetter, saveVoiceCapsule: soul.saveVoiceCapsule,
+      letters: soul.letters, generateMonthlyLetter: soul.generateMonthlyLetter, saveVoiceCapsule: soul.saveVoiceCapsule, generateWeeklyReport: soul.generateWeeklyReport,
       sleepTimer, startSleepTimer, stopSleepTimer, playIntroBoom,
       todaysCard: soul.todaysCard, showOracleModal: soul.showOracleModal, confirmOracle: soul.confirmOracle,
       fireflies, broadcastTouch,
@@ -395,5 +407,9 @@ const {
       mixerVolumes, setMixerVolumes,
       applyPreset, currentTheme, setTheme,
       replyToBottle: soul.replyToBottle,
+      monthlyMoods: soul.monthlyMoods,
+      showCalendar, setShowCalendar,
+      calYear, setCalYear,
+      calMonth, setCalMonth, binauralMode, setBinauralMode,
   };
 }

@@ -310,9 +310,36 @@ const applyPreset = (preset: 'focus' | 'sleep' | 'morning') => {
     }
 };
 
+  // [New] Binaural State ('none' | 'delta' | 'alpha' | 'theta')
+  const [binauralMode, setBinauralMode] = useState<string>('none');
+
+  // [New] Binaural Logic
+  useEffect(() => {
+      const beats = ['delta', 'alpha', 'theta'];
+      
+      beats.forEach(beat => {
+          const audio = document.getElementById(`binaural-${beat}`) as HTMLAudioElement;
+          if (!audio) return;
+
+          if (binauralMode === beat) {
+              // 켜야 할 비트
+              if (audio.paused) audio.play().catch(() => {});
+              // 바이노럴 비트는 배경음보다 살짝 작게, 은은하게 깔리도록 설정 (0.3 비율)
+              audio.volume = Math.max(0, Math.min(1, bgVolume * 0.3)); 
+          } else {
+              // 꺼야 할 비트
+              if (!audio.paused) {
+                  // 부드럽게 끄기 위해 서서히 볼륨 줄이고 정지 (간략화)
+                  audio.volume = 0;
+                  setTimeout(() => audio.pause(), 1000); 
+              }
+          }
+      });
+  }, [binauralMode, bgVolume]);
+
   return { initAudio, playWaterDrop, playWindChime, playPaperRustle, playMagicDust, playIntroBoom,
       isMixerMode, setIsMixerMode,
       mixerVolumes, setMixerVolumes,
-      applyPreset
+      applyPreset, binauralMode, setBinauralMode,
    };
 }

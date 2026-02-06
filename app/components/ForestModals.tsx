@@ -4,12 +4,11 @@ import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Lock, Palette, Unlock, Zap, Sparkles,Trash2, User, LogOut, Download, Share2, Settings2, Volume2, Square, Mic, Heart, Send, Flame, CloudRain, Wind, Trees, Sliders, Power, StopCircle, Play } from 'lucide-react';
 import Image from 'next/image';
-import { Artifact, ARTIFACTS, OracleCard, WhisperBottle, THEMES, ThemeId } from '../types';
+import { Artifact, ARTIFACTS, OracleCard, WhisperBottle, THEMES, ThemeId, SpiritFormType, SPIRIT_FORMS, DailyMood, EMOTION_COLORS } from '../types';
 import { toPng } from 'html-to-image'; // [Fix] 교체된 라이브러리
 import QRCode from 'react-qr-code';
-import { BurningPaperEffect } from './ForestVisuals'; 
-import { SpiritFormType, SPIRIT_FORMS } from '../types'; 
-import { SpiritWisp, SpiritFox } from './ForestVisuals'; // Import Visuals
+import { BurningPaperEffect,  SpiritWisp, SpiritFox } from './ForestVisuals'; 
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 
 // --- Helper Components ---
 const ModalOverlay = ({ children, onClose }: { children: React.ReactNode, onClose: () => void }) => (
@@ -134,7 +133,7 @@ export const SettingsModal = ({
     isOpen, onClose, 
     bgVolume, setBgVolume, voiceVolume, setVoiceVolume, // Master Volumes
     isMixerMode, setIsMixerMode, mixerVolumes, setMixerVolumes, applyPreset, // Mixer Props
-    currentTheme, setTheme, isPremium
+    currentTheme, setTheme, isPremium, binauralMode, setBinauralMode
 }: any) => {
 
     const [tab, setTab] = useState<'audio' | 'dreamscapes'>('audio'); // Tab State
@@ -247,7 +246,44 @@ export const SettingsModal = ({
                                 ))}
                             </div>
                         )}
+
+                        {/* 5. Binaural Healing Layers (Premium Only) */}
+                        <div className="mt-8 pt-6 border-t border-white/5">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-white/80 text-xs font-medium flex items-center gap-2">
+                                    <Zap size={14} className="text-yellow-200" /> 
+                                    Brainwave Therapy
+                                </h3>
+                                {!isPremium && <span className="text-[10px] bg-yellow-500/20 text-yellow-200 px-2 py-0.5 rounded border border-yellow-500/30">PREMIUM</span>}
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
+                                {[
+                                    { id: 'delta', label: 'Sleep', desc: 'Delta δ', color: 'bg-indigo-500/20 text-indigo-200' },
+                                    { id: 'alpha', label: 'Focus', desc: 'Alpha α', color: 'bg-emerald-500/20 text-emerald-200' },
+                                    { id: 'theta', label: 'Meditate', desc: 'Theta θ', color: 'bg-purple-500/20 text-purple-200' }
+                                ].map((beat) => (
+                                    <button
+                                        key={beat.id}
+                                        disabled={!isPremium}
+                                        onClick={() => setBinauralMode(binauralMode === beat.id ? 'none' : beat.id)} // 토글 방식
+                                        className={`relative p-3 rounded-xl border transition-all text-left group ${
+                                            binauralMode === beat.id 
+                                            ? `${beat.color} border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.1)]` 
+                                            : 'bg-white/5 border-white/5 text-white/40 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        <div className="text-xs font-bold mb-1">{beat.label}</div>
+                                        <div className="text-[9px] opacity-60 font-mono">{beat.desc}</div>
+                                        {binauralMode === beat.id && (
+                                            <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
+                    
                 )}
                 {/* CONTENT: DREAMSCAPES (New) */}
                 {tab === 'dreamscapes' && (
@@ -635,3 +671,117 @@ export const FireRitualModal = ({ isOpen, onClose, onBurn }: any) => {
         </ModalOverlay>
     );
 };
+
+// [New] Soul Calendar Modal
+export const SoulCalendarModal = ({ isOpen, onClose, moods, onMonthChange, currentYear, currentMonth }: { 
+    isOpen: boolean, 
+    onClose: () => void, 
+    moods: DailyMood[], 
+    onMonthChange: (y: number, m: number) => void,
+    currentYear: number,
+    currentMonth: number 
+}) => {
+    
+    if (!isOpen) return null;
+
+    // 감정별 색상 매핑 (Tailwind 클래스 대신 인라인 스타일용 Hex 코드 필요시 변환 혹은 EMOTION_COLORS 활용)
+    const getEmotionColor = (emotion: string, intensity: number) => {
+        // intensity(1~3)에 따라 투명도 조절
+        const opacity = 0.3 + (intensity * 0.2); 
+        switch (emotion) {
+            case 'happy': return `rgba(253, 224, 71, ${opacity})`; // Yellow
+            case 'sadness': return `rgba(96, 165, 250, ${opacity})`; // Blue
+            case 'anger': return `rgba(248, 113, 113, ${opacity})`; // Red
+            case 'loneliness': return `rgba(167, 139, 250, ${opacity})`; // Purple
+            case 'neutral': return `rgba(255, 255, 255, ${opacity * 0.5})`; // White
+            default: return `rgba(255, 255, 255, 0.1)`;
+        }
+    };
+
+    const handlePrevMonth = () => {
+        let newMonth = currentMonth - 1;
+        let newYear = currentYear;
+        if (newMonth < 1) { newMonth = 12; newYear--; }
+        onMonthChange(newYear, newMonth);
+    };
+
+    const handleNextMonth = () => {
+        let newMonth = currentMonth + 1;
+        let newYear = currentYear;
+        if (newMonth > 12) { newMonth = 1; newYear++; }
+        onMonthChange(newYear, newMonth);
+    };
+
+    // 달력 그리드 생성
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const firstDayOfWeek = new Date(currentYear, currentMonth - 1, 1).getDay(); // 0: Sun, 1: Mon...
+    
+    const calendarDays = [];
+    // 빈 칸 채우기
+    for (let i = 0; i < firstDayOfWeek; i++) {
+        calendarDays.push(<div key={`empty-${i}`} className="aspect-square" />);
+    }
+    // 날짜 채우기
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const dayMood = moods.find(m => m.date === dateStr);
+        
+        calendarDays.push(
+            <div key={d} className="aspect-square relative group">
+                <div 
+                    className="w-full h-full rounded-full flex items-center justify-center text-xs text-white/80 transition-all border border-white/5 group-hover:scale-110 cursor-pointer"
+                    style={{ 
+                        backgroundColor: dayMood ? getEmotionColor(dayMood.dominantEmotion, dayMood.intensity) : 'rgba(255,255,255,0.02)',
+                        boxShadow: dayMood ? `0 0 10px ${getEmotionColor(dayMood.dominantEmotion, 1)}` : 'none'
+                    }}
+                >
+                    {d}
+                </div>
+                {/* Tooltip */}
+                {dayMood && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[150px] bg-black/90 border border-white/10 p-2 rounded-lg text-[10px] text-white/80 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        <p className="font-bold mb-1 text-center capitalize">{dayMood.dominantEmotion}</p>
+                        <p className="line-clamp-2 italic">"{dayMood.summary}"</p>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    return (
+        <ModalOverlay onClose={onClose}>
+            <div className="bg-[#1a1a1a] border border-white/10 p-6 rounded-2xl shadow-2xl w-full max-w-md">
+                {/* Header */}
+                <div className="flex justify-between items-center mb-6">
+                    <button onClick={handlePrevMonth} className="p-2 hover:bg-white/10 rounded-full text-white/50 hover:text-white"><ChevronLeft size={20} /></button>
+                    <div className="text-center">
+                        <h2 className="text-xl font-serif text-white/90">{currentYear}. {String(currentMonth).padStart(2, '0')}</h2>
+                        <p className="text-[10px] text-white/30 uppercase tracking-widest mt-1">Constellation of Emotions</p>
+                    </div>
+                    <button onClick={handleNextMonth} className="p-2 hover:bg-white/10 rounded-full text-white/50 hover:text-white"><ChevronRight size={20} /></button>
+                </div>
+
+                {/* Weekday Header */}
+                <div className="grid grid-cols-7 mb-2 text-center">
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                        <div key={i} className="text-[10px] text-white/30 font-medium py-2">{day}</div>
+                    ))}
+                </div>
+
+                {/* Calendar Grid */}
+                <div className="grid grid-cols-7 gap-2">
+                    {calendarDays}
+                </div>
+
+                {/* Footer Legend */}
+                <div className="mt-6 flex justify-center gap-4 text-[9px] text-white/30">
+                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-yellow-400/50" />Happy</div>
+                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-400/50" />Sad</div>
+                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-400/50" />Anger</div>
+                    <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-purple-400/50" />Lonely</div>
+                </div>
+            </div>
+        </ModalOverlay>
+    );
+};
+

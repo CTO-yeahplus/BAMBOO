@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Memory, Artifact, ARTIFACTS, ArtifactType, ORACLE_DECK, OracleCard, WhisperBottle } from '../../types';
-import { SpiritFormType, SPIRIT_FORMS } from '../../types'; // Import 추가
+import { SpiritFormType, SPIRIT_FORMS, DailyMood, EMOTION_COLORS } from '../../types'; // Import 추가
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,7 +17,7 @@ export interface SoulLetter {
     created_at: string;
 }
 
-export function useSoulData(user: any, triggerSuccess: () => void, isPremium: boolean) { // [Change] isPremium 추가
+export function useSoulData(user: any, triggerSuccess: () => void, isPremium: boolean) {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [letters, setLetters] = useState<SoulLetter[]>([]); 
   const [resonance, setResonance] = useState(0);
@@ -84,8 +84,8 @@ export function useSoulData(user: any, triggerSuccess: () => void, isPremium: bo
     }
 };
 
-// [Modified] Find Random Bottle (수호자 우선 배정 로직)
-const findRandomBottle = async () => {
+  // [Modified] Find Random Bottle (수호자 우선 배정 로직)
+  const findRandomBottle = async () => {
     if (!user) return;
     
     let query = supabase.from('whisper_bottles')
@@ -107,12 +107,25 @@ const findRandomBottle = async () => {
         const random = data[Math.floor(Math.random() * poolSize)];
         setFoundBottle(random);
     } else {
-        // ... (기본 병 로직 유지)
-    }
-};
+        const defaultMessages = [
+            "이 숲에 도착한 유리병이 아직 없습니다.",
+            "바람이 잠잠하네요. 당신의 이야기를 먼저 들려주세요.",
+            "누군가의 목소리를 기다리고 있습니다."
+        ];
+        const randomMsg = defaultMessages[Math.floor(Math.random() * defaultMessages.length)];
 
-// [New] Reply with Voice (수호자의 답장)
-const replyToBottle = async (bottleId: number, audioBlob: Blob) => {
+        setFoundBottle({
+            id: 0,
+            content: randomMsg,
+            likes: 0,
+            created_at: new Date().toISOString(),
+            is_distress: false
+        });
+    }
+  };
+
+  // [New] Reply with Voice (수호자의 답장)
+  const replyToBottle = async (bottleId: number, audioBlob: Blob) => {
     if (!user) return;
     try {
         const fileName = `replies/${bottleId}_${Date.now()}.webm`;
@@ -139,6 +152,24 @@ const replyToBottle = async (bottleId: number, audioBlob: Blob) => {
     }
   };
 
+  const generateWeeklyReport = async () => {
+    if (!user) return;
+    // 이번 주 리포트가 있는지 확인 로직 (클라이언트 단에서 간단히 체크)
+    // 실제로는 API에서 중복 체크를 하는 것이 더 안전함
+    
+    try {
+        // 로딩 표시 등 필요
+        await fetch('/api/soul-report/weekly', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+        });
+        fetchLetters(); // 목록 갱신
+    } catch (e) {
+        console.error(e);
+    }
+  };
+
   // [Fix] catch 블록 제거 및 error 객체 확인 패턴으로 변경
   const likeBottle = async (bottleId: number) => {
       if (!foundBottle) return;
@@ -158,6 +189,62 @@ const replyToBottle = async (bottleId: number, audioBlob: Blob) => {
       }
       triggerSuccess();
   };
+
+  // [New] Calendar Data State
+  const [monthlyMoods, setMonthlyMoods] = useState<DailyMood[]>([]);
+
+  // [New] Fetch Monthly Moods
+  const fetchMonthlyMoods = useCallback(async (year: number, month: number) => {
+      if (!user) return;
+
+      // 해당 월의 시작일과 종료일 계산
+      const startDate = new Date(year, month - 1, 1).toISOString();
+      const endDate = new Date(year, month, 0).toISOString();
+
+      const { data } = await supabase
+          .from('memories')
+          .select('created_at, emotion, summary')
+          .eq('user_id', user.id)
+          .gte('created_at', startDate)
+          .lte('created_at', endDate);
+
+      if (!data) return;
+
+      // 날짜별로 그룹화 및 감정 집계
+      const grouped: Record<string, { emotions: string[], summaries: string[] }> = {};
+
+      data.forEach((m: any) => {
+          const dateStr = new Date(m.created_at).toLocaleDateString('en-CA'); // YYYY-MM-DD
+          if (!grouped[dateStr]) grouped[dateStr] = { emotions: [], summaries: [] };
+          if (m.emotion) grouped[dateStr].emotions.push(m.emotion);
+          if (m.summary) grouped[dateStr].summaries.push(m.summary);
+      });
+
+      // DailyMood 형식으로 변환
+      const moods: DailyMood[] = Object.keys(grouped).map(date => {
+          const dayData = grouped[date];
+          
+          // 가장 많이 등장한 감정 찾기
+          const emotionCounts: Record<string, number> = {};
+          dayData.emotions.forEach(e => { emotionCounts[e] = (emotionCounts[e] || 0) + 1; });
+          
+          let dominant = 'neutral';
+          let max = 0;
+          for (const [e, count] of Object.entries(emotionCounts)) {
+              if (count > max) { max = count; dominant = e; }
+          }
+
+          return {
+              date,
+              dominantEmotion: dominant as any,
+              intensity: Math.min(dayData.emotions.length, 3), // 대화가 많을수록 진하게 (최대 3단계)
+              summary: dayData.summaries[dayData.summaries.length - 1] || "기록된 대화가 없습니다.", // 마지막 요약 사용
+              count: dayData.emotions.length
+          };
+      });
+
+      setMonthlyMoods(moods);
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -214,15 +301,19 @@ const replyToBottle = async (bottleId: number, audioBlob: Blob) => {
 
   return { 
       memories, fetchMemories, 
-      letters, generateMonthlyLetter, 
+      letters, generateMonthlyLetter, generateWeeklyReport,
       resonance, addResonance, 
       ownedItems, equippedItems, 
       unlockArtifact, equipArtifact, 
       soulLevel, ARTIFACTS,
       saveVoiceCapsule,
       todaysCard, showOracleModal, confirmOracle,
-      sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle,
-      spiritForm, changeSpiritForm, SPIRIT_FORMS,showGalleryModal, setShowGalleryModal,
-      replyToBottle,
+      sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle, replyToBottle, 
+      // 4. [Missing Fix] 여기가 빠져서 에러가 났습니다! (필수 복구)
+      spiritForm, 
+      changeSpiritForm, 
+      SPIRIT_FORMS,
+      showGalleryModal, setShowGalleryModal,
+      monthlyMoods, fetchMonthlyMoods,
   };
 }

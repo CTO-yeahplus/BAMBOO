@@ -365,7 +365,7 @@ export const SpiritAccessory = ({ type }: { type: string | null }) => {
 export const FloatingBottle = ({ onClick }: { onClick: () => void }) => {
     return (
         <motion.div
-            className="absolute z-20 cursor-pointer group"
+            className="absolute z-20 cursor-pointer group pointer-events-auto"
             initial={{ x: -100, y: '80%', opacity: 0, rotate: 15 }}
             animate={{ 
                 x: ['-10vw', '110vw'], // 화면 왼쪽에서 오른쪽으로 흐름

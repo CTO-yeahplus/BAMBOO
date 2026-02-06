@@ -4,6 +4,7 @@ export type WeatherType = 'clear' | 'rain' | 'snow' | 'ember';
 export type CallStatus = 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'processing';
 export type SeasonType = 'spring' | 'summer' | 'autumn' | 'winter';
 export type ThemeId = 'bamboo' | 'aurora' | 'sakura' | 'cyberpunk';
+export type ArtifactType = 'aura' | 'head';
 
 export interface ThemeConfig {
   id: ThemeId;
@@ -117,8 +118,6 @@ export const EMOTION_COLORS = {
   work: ['from-zinc-950', 'via-slate-950', 'to-black'],
 };
 
-export type ArtifactType = 'aura' | 'head';
-
 export interface Artifact {
     id: string;
     type: ArtifactType;
@@ -126,6 +125,14 @@ export interface Artifact {
     description: string;
     cost: number;
     icon: string;
+}
+
+export interface DailyMood {
+  date: string;       // "2023-10-27" 형태
+  dominantEmotion: 'sadness' | 'anger' | 'loneliness' | 'happy' | 'neutral';
+  intensity: number;  // 1~3 (색상의 진하기)
+  summary: string;    // 그날의 핵심 요약
+  count: number;      // 대화 횟수
 }
 
 // [New] Firefly User Type (Realtime Presence)
