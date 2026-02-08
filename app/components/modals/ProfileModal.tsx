@@ -1,127 +1,114 @@
-// app/components/modals/ProfileModal.tsx
-
 'use client';
 import React from 'react';
 import { ModalOverlay } from './ModalOverlay';
-import { User, Sparkles, History, LogOut, Crown } from 'lucide-react';
-import { OracleCard } from '../../types';
+import { LogOut, User, Sparkles, Crown, BookOpen, Star, Leaf, Wind } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface ProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
     user: any;
-    
-    // 👇 [Fix] page.tsx에서 보내주는 값들을 받을 수 있게 추가합니다.
-    isPremium?: boolean;            // 프리미엄 여부 (없을 수도 있으니 ?)
-    signOut: () => void;            // 로그아웃 함수 이름 통일 (onLogout -> signOut)
-    getUserInitial?: (name: string) => string; // 이니셜 함수
-    
-    oracleHistory?: { date: string; cardId: string }[]; 
-    memories?: any[]; 
-    cards?: OracleCard[]; 
+    isPremium: boolean;
+    signOut: () => void;
+    getUserInitial: () => string;
 }
 
-export const ProfileModal = ({ 
-    isOpen, 
-    onClose, 
-    user, 
-    isPremium = false, // 기본값 false
-    signOut, 
-    oracleHistory = [],
-    memories = [],
-    cards = []
-}: ProfileModalProps) => {
-    if (!isOpen) return null;
+export const ProfileModal = ({ isOpen, onClose, user, isPremium, signOut, getUserInitial }: ProfileModalProps) => {
+    if (!isOpen || !user) return null;
 
-    // 최근 오라클 카드 찾기
-    const lastOracle = oracleHistory && oracleHistory.length > 0 && cards.length > 0
-        ? cards.find(c => c.id === oracleHistory[0].cardId) 
-        : null;
+    // 예시 통계 데이터 (실제 데이터와 연결 필요)
+    const stats = {
+        memories: 24,
+        days: 12,
+        level: 3
+    };
 
-    // 유저 이름 추출
-    const userName = user?.email?.split('@')[0] || 'Traveler';
+    // 애니메이션 변수
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+    };
+    const itemVariants = {
+        hidden: { opacity: 0, y: 10 },
+        visible: { opacity: 1, y: 0 }
+    };
 
     return (
-        <ModalOverlay onClose={onClose} title="Traveler's Profile">
-            <div className="p-6 space-y-6">
+        // Title & Subtitle: 감성적인 언어로 변경
+        <ModalOverlay onClose={onClose} title="Soul Mirror" subtitle="Reflecting your inner journey">
+            <motion.div 
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="p-6 flex flex-col items-center"
+            >
                 
-                {/* 1. 유저 정보 */}
-                <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/10 relative overflow-hidden">
-                    {/* 프리미엄 유저일 경우 배경 효과 */}
-                    {isPremium && <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 pointer-events-none"></div>}
+                {/* 🔮 1. 아바타: 숨쉬는 빛의 구체 */}
+                <motion.div variants={itemVariants} className="relative mb-6 group">
+                    <div className={`absolute inset-0 rounded-full blur-[30px] animate-pulse-slow ${isPremium ? 'bg-yellow-500/40' : 'bg-blue-500/30'}`} />
+                    <div className={`relative w-28 h-28 rounded-full flex items-center justify-center text-4xl font-serif font-bold text-white shadow-2xl ring-2 ring-offset-4 ring-offset-[#151518] transition-all duration-500 ${isPremium ? 'bg-gradient-to-br from-yellow-400 to-orange-600 ring-yellow-500/50 group-hover:ring-yellow-400' : 'bg-gradient-to-br from-blue-400 to-indigo-600 ring-blue-500/50 group-hover:ring-blue-400'}`}>
+                        {getUserInitial()}
+                        {isPremium && (
+                            <motion.div 
+                                animate={{ rotate: [0, 10, -10, 0] }}
+                                transition={{ duration: 4, repeat: Infinity }}
+                                className="absolute -top-2 -right-2 bg-yellow-500 text-black p-1.5 rounded-full shadow-lg"
+                            >
+                                <Crown size={16} fill="currentColor" />
+                            </motion.div>
+                        )}
+                    </div>
+                </motion.div>
 
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center border-2 ${isPremium ? 'border-yellow-400 bg-yellow-400/10' : 'border-indigo-500/30 bg-indigo-500/10'}`}>
-                        {isPremium ? <Crown size={28} className="text-yellow-400" /> : <User size={28} className="text-indigo-300" />}
-                    </div>
-                    
-                    <div className="z-10">
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            {userName}
-                        </h2>
-                        <p className="text-xs text-white/50">{user?.email}</p>
-                        
-                        {/* 레벨 뱃지 */}
-                        <div className="mt-2 flex gap-2">
-                             {isPremium ? (
-                                 <span className="text-[10px] bg-yellow-400/20 border border-yellow-400/50 px-2 py-1 rounded-full text-yellow-200 flex items-center gap-1">
-                                    <Sparkles size={10} /> Premium Soul
-                                 </span>
-                             ) : (
-                                 <span className="text-[10px] bg-white/10 px-2 py-1 rounded-full text-white/70">
-                                    🌱 Lv.1 Seed
-                                 </span>
-                             )}
-                        </div>
-                    </div>
-                </div>
+                {/* 사용자 이름 & 등급 */}
+                <motion.div variants={itemVariants} className="text-center mb-8">
+                    <h3 className="text-white text-xl font-medium tracking-wide">
+                        {user.email?.split('@')[0] || 'Wanderer'}
+                    </h3>
+                    <p className={`text-sm mt-1 font-light tracking-widest uppercase flex items-center justify-center gap-2 ${isPremium ? 'text-yellow-300' : 'text-white/50'}`}>
+                        {isPremium ? <><Sparkles size={12} className="animate-pulse" /> Awakened Soul</> : 'Seeking Soul'}
+                    </p>
+                </motion.div>
 
-                {/* 2. 통계 */}
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-white/5 p-4 rounded-xl text-center border border-white/10">
-                        <div className="text-white/40 text-xs uppercase tracking-widest mb-1">Total Memories</div>
-                        <div className="text-2xl font-bold text-white">{memories?.length || 0}</div>
-                    </div>
-                    <div className="bg-white/5 p-4 rounded-xl text-center border border-white/10">
-                        <div className="text-white/40 text-xs uppercase tracking-widest mb-1">Oracle Readings</div>
-                        <div className="text-2xl font-bold text-white">{oracleHistory?.length || 0}</div>
-                    </div>
-                </div>
+                {/* 📜 2. 통계: 고대 룬 문자 컨셉의 카드 */}
+                <motion.div variants={itemVariants} className="w-full grid grid-cols-3 gap-3 mb-8">
+                    {[
+                        { icon: BookOpen, label: 'Memories', value: stats.memories, color: 'text-blue-400' },
+                        { icon: Leaf, label: 'Days', value: stats.days, color: 'text-green-400' },
+                        { icon: Star, label: 'Level', value: stats.level, color: 'text-purple-400' },
+                    ].map((stat, index) => (
+                        <div key={index} className="bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center relative overflow-hidden group hover:bg-white/10 transition-colors">
+                            <div className={`absolute inset-0 bg-${stat.color.split('-')[1]}-500/5 blur-xl opacity-0 group-hover:opacity-100 transition-opacity`} />
+                            <stat.icon size={20} className={`${stat.color} mb-2 opacity-80`} />
+                            <span className="text-2xl font-bold text-white">{stat.value}</span>
+                            <span className="text-[10px] text-white/40 uppercase tracking-wider mt-1">{stat.label}</span>
+                        </div>
+                    ))}
+                </motion.div>
 
-                {/* 3. 최근 오라클 기록 */}
-                <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                    <div className="flex items-center gap-2 mb-3 text-white/70">
-                        <History size={16} />
-                        <span className="text-sm font-bold">Recent Oracle</span>
-                    </div>
-                    
-                    {lastOracle ? (
-                        <div className="flex gap-4 items-center bg-black/20 p-3 rounded-lg">
-                            <div className="w-12 h-16 bg-indigo-900/50 rounded border border-white/20 flex items-center justify-center min-w-[3rem]">
-                                <Sparkles size={16} className="text-white/50" />
-                            </div>
-                            <div>
-                                <div className="text-white font-bold text-sm line-clamp-1">{lastOracle.name}</div>
-                                <div className="text-white/50 text-xs line-clamp-1">{lastOracle.message}</div>
-                                <div className="text-white/30 text-[10px] mt-1">
-                                    {oracleHistory[0]?.date}
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-center text-white/30 text-xs py-4">
-                            아직 숲의 조언을 듣지 못했습니다.
-                        </div>
+                {/* 하단 액션 버튼들 */}
+                <motion.div variants={itemVariants} className="w-full space-y-3">
+                    {/* 🌟 3. 프리미엄: 황금빛 차원문 */}
+                    {!isPremium && (
+                        <button className="w-full py-3 rounded-xl bg-gradient-to-r from-yellow-600/80 to-orange-600/80 text-white font-bold tracking-wider uppercase relative overflow-hidden group hover:shadow-[0_0_30px_rgba(255,200,0,0.3)] transition-shadow">
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                            <span className="flex items-center justify-center gap-2 relative z-10">
+                                <Crown size={16} /> Awaken Your Soul
+                            </span>
+                        </button>
                     )}
-                </div>
+                    
+                    {/* 로그아웃: 은은한 경계선 버튼 */}
+                    <button 
+                        onClick={signOut}
+                        className="w-full py-3 rounded-xl border border-white/10 text-white/60 hover:text-white hover:bg-white/5 hover:border-red-500/30 hover:text-red-400 transition-all flex items-center justify-center gap-2 text-sm tracking-widest uppercase group"
+                    >
+                        <LogOut size={16} className="group-hover:rotate-12 transition-transform" />
+                        Leave Forest
+                    </button>
+                </motion.div>
 
-                {/* 4. 로그아웃 버튼 */}
-                <button 
-                    onClick={signOut}
-                    className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm transition-colors mt-4 cursor-pointer"
-                >
-                    <LogOut size={16} /> Leave the Forest
-                </button>
-            </div>
+            </motion.div>
         </ModalOverlay>
     );
 };

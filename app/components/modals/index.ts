@@ -9,3 +9,5 @@ export { FireRitualModal } from './FireRitualModal';
 export { SoulCalendarModal } from './SoulCalendarModal';
 export { SoulographyModal } from './SoulographyModal';
 export { SpiritCapsuleModal } from './SpiritCapsuleModal';
+export * from './MailboxModal';
+export * from './JournalModal';

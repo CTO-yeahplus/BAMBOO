@@ -58,10 +58,6 @@ export const ModalOverlay = ({ onClose, children, title, subtitle }: ModalOverla
                         e.stopPropagation();
                     }}
                     className="relative w-full max-w-[340px] md:max-w-md bg-gradient-to-b from-[#1c1c22] to-[#0f0f12] border border-white/10 rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col ring-1 ring-white/5"                >
-                    {/* 🚧 [물리적 격리 구역] 🚧
-                       버튼을 absolute로 띄우지 않고, 별도의 Flex Header로 만듭니다.
-                       이렇게 하면 내용물이 이 영역을 침범할 수 없습니다.
-                    */}
                         {/* Header Area */}
                     <div 
                         className="flex flex-col items-center justify-center pt-8 pb-4 px-6 relative z-10"

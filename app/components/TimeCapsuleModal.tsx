@@ -1,16 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { X, Mic, Square, Play, Save, Calendar, Loader2, Hourglass } from 'lucide-react';
-
-const ModalOverlay = ({ children, onClose }: { children: React.ReactNode, onClose: () => void }) => (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-        <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} onClick={(e) => e.stopPropagation()} className="relative w-full max-w-md">
-            {children}
-        </motion.div>
-    </motion.div>
-);
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Mic, Square, Play, Save, Calendar, Loader2, Hourglass, Sparkles, Sun, Moon, TreeDeciduous, ArrowRight, RotateCcw } from 'lucide-react';
+import { ModalOverlay } from './modals/ModalOverlay'; // 공통 모달 오버레이 사용
 
 export const TimeCapsuleModal = ({ isOpen, onClose, onSave }: any) => {
     const [step, setStep] = useState<'record' | 'date'>('record');
@@ -24,50 +17,55 @@ export const TimeCapsuleModal = ({ isOpen, onClose, onSave }: any) => {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
-    const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
 
+    // 모달이 닫히거나 열릴 때 초기화
     useEffect(() => {
-        if (!isOpen) {
-            resetState();
+        if (isOpen) {
+            setStep('record');
+            setAudioBlob(null);
+            setAudioUrl(null);
+            setRecordingTime(0);
+            setSelectedDate(null);
+        } else {
+            handleReset();
         }
     }, [isOpen]);
 
-    const resetState = () => {
-        setStep('record');
+    const handleReset = () => {
+        setIsRecording(false);
+        if (timerRef.current) clearInterval(timerRef.current);
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
         setAudioBlob(null);
         setAudioUrl(null);
         setRecordingTime(0);
-        setIsRecording(false);
-        setIsSaving(false);
-        setSelectedDate(null);
-        if (timerRef.current) clearInterval(timerRef.current);
     };
 
     const startRecording = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorderRef.current = new MediaRecorder(stream);
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
             chunksRef.current = [];
 
-            mediaRecorderRef.current.ondataavailable = (e) => {
+            mediaRecorder.ondataavailable = (e) => {
                 if (e.data.size > 0) chunksRef.current.push(e.data);
             };
 
-            mediaRecorderRef.current.onstop = () => {
+            mediaRecorder.onstop = () => {
                 const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
                 setAudioBlob(blob);
                 setAudioUrl(URL.createObjectURL(blob));
-                stream.getTracks().forEach(track => track.stop()); // Stop stream
+                stream.getTracks().forEach(track => track.stop());
             };
 
-            mediaRecorderRef.current.start();
+            mediaRecorder.start();
             setIsRecording(true);
-            
             timerRef.current = setInterval(() => {
                 setRecordingTime(prev => prev + 1);
             }, 1000);
         } catch (err) {
-            console.error("Mic access denied:", err);
+            console.error("Microphone access denied:", err);
             alert("마이크 권한이 필요합니다.");
         }
     };
@@ -80,111 +78,201 @@ export const TimeCapsuleModal = ({ isOpen, onClose, onSave }: any) => {
         }
     };
 
-    const handleSave = async () => {
-        if (!audioBlob || !selectedDate) return;
-        setIsSaving(true);
-        // Date Logic
-        const today = new Date();
-        let unlockDate = new Date();
-        
-        switch (selectedDate) {
-            case 'tomorrow': unlockDate.setDate(today.getDate() + 1); break;
-            case 'week': unlockDate.setDate(today.getDate() + 7); break;
-            case 'month': unlockDate.setMonth(today.getMonth() + 1); break;
-            case 'year': unlockDate.setFullYear(today.getFullYear() + 1); break;
-        }
-
-        await onSave(audioBlob, "Time Capsule", unlockDate.toISOString());
-        setIsSaving(false);
-        onClose();
-    };
-
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
+    const handleSaveCapsule = async () => {
+        if (!audioBlob || !selectedDate) return;
+        setIsSaving(true);
+        
+        const now = new Date();
+        let unlockDate = new Date();
+
+        switch (selectedDate) {
+            case 'tomorrow': unlockDate.setDate(now.getDate() + 1); break;
+            case 'week': unlockDate.setDate(now.getDate() + 7); break;
+            case 'month': unlockDate.setMonth(now.getMonth() + 1); break;
+            case 'year': unlockDate.setFullYear(now.getFullYear() + 1); break;
+        }
+
+        await onSave(audioBlob, unlockDate);
+        setIsSaving(false);
+        onClose();
+    };
+
+    const timeOptions = [
+        { id: 'tomorrow', label: 'Tomorrow', sub: '24 Hours', icon: Sun, color: 'text-orange-400' },
+        { id: 'week', label: 'Next Week', sub: '7 Days', icon: Calendar, color: 'text-blue-400' },
+        { id: 'month', label: 'Next Month', sub: '30 Days', icon: Moon, color: 'text-purple-400' },
+        { id: 'year', label: 'Next Year', sub: '365 Days', icon: TreeDeciduous, color: 'text-green-400' },
+    ];
+
     if (!isOpen) return null;
 
     return (
-        <ModalOverlay onClose={onClose}>
-            <div className="bg-[#1a1a1a] border border-yellow-500/30 p-6 rounded-2xl shadow-[0_0_50px_rgba(234,179,8,0.1)] relative overflow-hidden">
-                {/* Header */}
-                <div className="flex justify-between items-center mb-6 relative z-10">
-                    <h2 className="text-yellow-200/90 text-lg font-serif italic flex items-center gap-2">
-                        <Hourglass size={18} className="text-yellow-500" />
-                        Voice Time Capsule
-                    </h2>
-                    <button onClick={onClose}><X className="text-white/30 hover:text-white" /></button>
-                </div>
-
-                {/* Content */}
-                <div className="relative z-10 min-h-[250px] flex flex-col items-center justify-center">
-                    {step === 'record' ? (
-                        <>
-                            {!audioBlob ? (
-                                <div className="flex flex-col items-center gap-6">
-                                    <div className={`w-32 h-32 rounded-full border-2 flex items-center justify-center transition-all ${isRecording ? 'border-red-500 bg-red-500/10 shadow-[0_0_30px_rgba(239,68,68,0.3)]' : 'border-white/10 bg-white/5'}`}>
-                                        <button 
+        <ModalOverlay onClose={onClose} title="Time Capsule" subtitle="Buried in time">
+            <div className="relative w-full max-w-[320px] mx-auto min-h-[400px] flex flex-col">
+                
+                <AnimatePresence mode="wait">
+                    {/* STEP 1: RECORDING */}
+                    {step === 'record' && (
+                        <motion.div 
+                            key="record"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            className="flex flex-col items-center justify-between h-full py-4"
+                        >
+                            {/* Visualizer Area */}
+                            <div className="flex-1 flex flex-col items-center justify-center w-full relative">
+                                {!audioUrl ? (
+                                    // Recording State
+                                    <div className="relative">
+                                        {/* Pulse Effect */}
+                                        {isRecording && (
+                                            <>
+                                                <motion.div 
+                                                    className="absolute inset-0 bg-amber-500/30 rounded-full blur-xl"
+                                                    animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
+                                                    transition={{ duration: 1.5, repeat: Infinity }}
+                                                />
+                                                <motion.div 
+                                                    className="absolute inset-0 bg-amber-400/20 rounded-full"
+                                                    animate={{ scale: [1, 1.2, 1] }}
+                                                    transition={{ duration: 1.5, repeat: Infinity }}
+                                                />
+                                            </>
+                                        )}
+                                        
+                                        {/* Mic Button */}
+                                        <button
                                             onClick={isRecording ? stopRecording : startRecording}
-                                            className="w-full h-full flex items-center justify-center rounded-full"
+                                            className={`relative z-10 w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 shadow-[0_0_30px_rgba(0,0,0,0.5)] border-4 ${
+                                                isRecording 
+                                                ? 'bg-red-500/90 border-red-400 text-white scale-110' 
+                                                : 'bg-gradient-to-br from-amber-400 to-yellow-600 border-amber-200 text-black hover:scale-105'
+                                            }`}
                                         >
-                                            {isRecording ? <Square size={32} className="text-red-400 fill-red-400" /> : <Mic size={32} className="text-white/50" />}
+                                            {isRecording ? <Square fill="currentColor" size={32} /> : <Mic size={36} />}
                                         </button>
                                     </div>
-                                    <p className="text-white/60 font-mono text-xl">{formatTime(recordingTime)}</p>
-                                    <p className="text-white/30 text-xs">미래의 나에게 목소리를 남기세요.</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center gap-6 w-full">
-                                    <div className="w-full bg-white/5 p-4 rounded-xl flex items-center gap-4 border border-white/10">
-                                        <button onClick={() => audioPlayerRef.current?.play()} className="p-3 bg-yellow-500/20 rounded-full text-yellow-200 hover:bg-yellow-500/30">
-                                            <Play size={20} fill="currentColor" />
-                                        </button>
-                                        <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
-                                            <div className="h-full bg-yellow-500/50 w-full animate-pulse" />
+                                ) : (
+                                    // Preview State
+                                    <motion.div 
+                                        initial={{ scale: 0.8, opacity: 0 }} 
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        className="w-full flex flex-col items-center gap-6"
+                                    >
+                                        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-400 to-yellow-600 flex items-center justify-center shadow-[0_0_30px_rgba(234,179,8,0.4)] animate-pulse">
+                                            <Hourglass size={36} className="text-black spin-slow" />
                                         </div>
-                                        <audio ref={audioPlayerRef} src={audioUrl!} className="hidden" />
+                                        <audio ref={audioRef} src={audioUrl} controls className="hidden" />
+                                        <div className="flex gap-4">
+                                            <button 
+                                                onClick={() => audioRef.current?.play()}
+                                                className="px-6 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center gap-2 transition-all border border-white/10"
+                                            >
+                                                <Play size={16} fill="currentColor" /> Preview
+                                            </button>
+                                            <button 
+                                                onClick={handleReset}
+                                                className="px-6 py-2 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center gap-2 transition-all border border-red-500/10"
+                                            >
+                                                <RotateCcw size={16} /> Retry
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* Timer & Helper Text */}
+                                <div className="mt-8 text-center space-y-2">
+                                    <div className="text-3xl font-mono font-bold text-amber-200 tracking-wider">
+                                        {formatTime(recordingTime)}
                                     </div>
-                                    <div className="flex gap-4 w-full">
-                                        <button onClick={() => { setAudioBlob(null); setRecordingTime(0); }} className="flex-1 py-3 border border-white/10 rounded-xl text-white/50 hover:bg-white/5 text-sm">재녹음</button>
-                                        <button onClick={() => setStep('date')} className="flex-1 py-3 bg-yellow-600/20 border border-yellow-500/30 rounded-xl text-yellow-200 hover:bg-yellow-600/30 text-sm font-medium">다음</button>
-                                    </div>
+                                    <p className="text-xs text-white/40 uppercase tracking-widest">
+                                        {isRecording ? "Recording Soul Fragment..." : !audioUrl ? "Tap to record voice" : "Fragment Captured"}
+                                    </p>
                                 </div>
+                            </div>
+
+                            {/* Next Button */}
+                            {audioUrl && (
+                                <motion.button
+                                    initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+                                    onClick={() => setStep('date')}
+                                    className="w-full py-4 bg-white text-black font-bold rounded-xl shadow-lg hover:bg-gray-200 transition-all flex items-center justify-center gap-2 mt-4"
+                                >
+                                    Select Unlock Time <ArrowRight size={16} />
+                                </motion.button>
                             )}
-                        </>
-                    ) : (
-                        <div className="w-full flex flex-col gap-4">
-                            <p className="text-center text-white/60 text-sm mb-2">언제 이 기억을 열어볼까요?</p>
-                            <div className="grid grid-cols-2 gap-3">
-                                {[
-                                    { id: 'tomorrow', label: '내일', sub: 'Tomorrow' },
-                                    { id: 'week', label: '일주일 뒤', sub: 'Next Week' },
-                                    { id: 'month', label: '한 달 뒤', sub: 'Next Month' },
-                                    { id: 'year', label: '일 년 뒤', sub: 'Next Year' }
-                                ].map((opt) => (
-                                    <button 
+                        </motion.div>
+                    )}
+
+                    {/* STEP 2: DATE SELECTION */}
+                    {step === 'date' && (
+                        <motion.div 
+                            key="date"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            className="flex flex-col h-full py-2"
+                        >
+                            <div className="text-center mb-6">
+                                <h3 className="text-lg font-serif text-white/90">When shall it awaken?</h3>
+                                <p className="text-xs text-white/40">Choose a moment in the future</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 mb-6">
+                                {timeOptions.map((opt) => (
+                                    <button
                                         key={opt.id}
                                         onClick={() => setSelectedDate(opt.id)}
-                                        className={`p-4 rounded-xl border transition-all text-left ${selectedDate === opt.id ? 'bg-yellow-500/20 border-yellow-500/50 text-white' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}
+                                        className={`relative p-4 rounded-2xl border transition-all duration-300 flex flex-col items-center gap-3 text-center group ${
+                                            selectedDate === opt.id 
+                                            ? 'bg-amber-500/20 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' 
+                                            : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                                        }`}
                                     >
-                                        <span className="block text-sm font-bold">{opt.label}</span>
-                                        <span className="block text-[10px] opacity-50 uppercase tracking-wider">{opt.sub}</span>
+                                        <div className={`p-2 rounded-full bg-white/5 ${selectedDate === opt.id ? 'text-amber-400' : opt.color}`}>
+                                            <opt.icon size={20} />
+                                        </div>
+                                        <div>
+                                            <span className={`block text-sm font-bold ${selectedDate === opt.id ? 'text-white' : 'text-white/70'}`}>
+                                                {opt.label}
+                                            </span>
+                                            <span className="block text-[10px] text-white/30 uppercase tracking-wider mt-1">
+                                                {opt.sub}
+                                            </span>
+                                        </div>
+                                        {selectedDate === opt.id && (
+                                            <motion.div layoutId="glow" className="absolute inset-0 rounded-2xl ring-2 ring-amber-500/50" />
+                                        )}
                                     </button>
                                 ))}
                             </div>
-                            <button 
-                                onClick={handleSave}
-                                disabled={!selectedDate || isSaving}
-                                className="mt-4 w-full py-4 bg-yellow-500 text-black font-bold rounded-xl shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:bg-yellow-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                {isSaving ? <Loader2 className="animate-spin" /> : <Save size={18} />}
-                                묻어두기
-                            </button>
-                        </div>
+
+                            <div className="mt-auto space-y-3">
+                                <button 
+                                    onClick={handleSaveCapsule}
+                                    disabled={!selectedDate || isSaving}
+                                    className="w-full py-4 bg-gradient-to-r from-amber-500 to-yellow-600 text-black font-bold rounded-xl shadow-[0_0_20px_rgba(234,179,8,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {isSaving ? <Loader2 className="animate-spin" /> : <Sparkles size={18} />}
+                                    Bury Capsule
+                                </button>
+                                <button 
+                                    onClick={() => setStep('record')}
+                                    className="w-full py-3 text-white/40 hover:text-white text-xs uppercase tracking-widest transition-colors"
+                                >
+                                    Back to Recording
+                                </button>
+                            </div>
+                        </motion.div>
                     )}
-                </div>
+                </AnimatePresence>
             </div>
         </ModalOverlay>
     );

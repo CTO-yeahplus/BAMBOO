@@ -13,7 +13,8 @@ import { InstallPrompt } from './components/InstallPrompt';
 import { ForestGuide } from './components/ForestGuide';
 import { supabase } from './utils/supabase'; 
 import { IntroSequence } from './components/IntroSequence';
-
+import { MailboxModal } from './components/modals';
+import { JournalModal } from './components/modals';
 // Components
 import { MemoryLantern, ForestBackground, LivingSpirit, SpiritRenderer, SoulTree, FireflyLayer, FloatingBottle, BurningPaperEffect, MemoryFlower, GoldenCocoon, SpringPetal, SummerFirefly, AutumnLeaf, ConstellationLayer, OrbitLayer} from './components/visuals';
 import { OracleModal, SettingsModal, AltarModal, ProfileModal, BottleModals, FireRitualModal, SoulCalendarModal, SoulographyModal, SpiritCapsuleModal} from './components/modals'; // index.ts 덕분에 폴더명만 써도 됨
@@ -52,7 +53,7 @@ export default function BambooForest() {
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [showMailbox, setShowMailbox] = useState(false);
   const [showWriteBottle, setShowWriteBottle] = useState(false);
-  const [selectedLetter, setSelectedLetter] = useState<any>(null);
+  //const [selectedLetter, setSelectedLetter] = useState<any>(null);
   const [showSleepMenu, setShowSleepMenu] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [viewMode, setViewMode] = useState<'stars' | 'orbit'>('stars');
@@ -61,7 +62,9 @@ export default function BambooForest() {
   const [inputText, setInputText] = useState("");
   const [particles, setParticles] = useState<Particle[]>([]);
   
-  
+  // 👇 [New] 달력용 메모리 데이터 상태 추가
+  const [calendarMemories, setCalendarMemories] = useState<any[]>([]);
+
   // Intro Visibility State
   const [introVisible, setIntroVisible] = useState(true);
 
@@ -117,13 +120,30 @@ export default function BambooForest() {
 
   // 시네마틱 애니메이션 설정 (아주 부드러운 전환)
   const cinematicTransition = { duration: 2.5, ease: "easeInOut" } as const;
+  
   // [Fix] 캘린더가 열릴 때, 해당 월의 감정 데이터를 가져옵니다.
+  // 👇 [Modified] 전체 메모리를 가져오도록 수정 (Supabase 연동)
   useEffect(() => {
-    if (engine.showCalendar) {
-        console.log(`📅 Calendar Opened: Fetching data for ${engine.calYear}-${engine.calMonth}`);
-        engine.fetchMonthlyMoods(engine.calYear, engine.calMonth);
+    if (engine.showCalendar && user) {
+        console.log(`📅 Calendar Opened: Fetching all memories for user ${user.id}`);
+        
+        const fetchCalendarData = async () => {
+            const { data, error } = await supabase
+                .from('memories')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+            
+            if (data) {
+                console.log("✅ Fetched Memories Count:", data.length);
+                setCalendarMemories(data);
+            }
+            if (error) console.error("❌ Failed to fetch memories:", error);
+        };
+        
+        fetchCalendarData();
     }
-  }, [engine.showCalendar]);
+  }, [engine.showCalendar, user]);
 
   return (
     <main className="relative flex flex-col items-center justify-center w-full h-screen overflow-hidden bg-black touch-none" onMouseMove={(e) => {}} onPointerDown={handleGlobalClick}>
@@ -420,13 +440,15 @@ export default function BambooForest() {
                     // 상태 전달
                     currentYear={engine.calYear}
                     currentMonth={engine.calMonth}
-                    moods={engine.monthlyMoods}
+                    // moods={engine.monthlyMoods} // 👇 기존 방식 삭제
+                    memories={calendarMemories}    // 👈 [Fix] 새로 가져온 전체 데이터 전달
+                    currentUser={user}             // 👈 [Fix] 유저 정보 전달
                     
-                    // 👇 [Fix] 달을 변경할 때: 1.숫자 변경 + 2.데이터 새로고침
+                    // 👇 [Fix] 달을 변경할 때: 1.숫자 변경 + 2.데이터 새로고침 (기존 로직 유지하되, 필요시 수정 가능)
                     onMonthChange={(year, month) => {
                         engine.setCalYear(year);
                         engine.setCalMonth(month);
-                        engine.fetchMonthlyMoods(year, month); // 이 줄이 있어야 데이터가 바뀝니다!
+                        // engine.fetchMonthlyMoods(year, month); // 필요하다면 유지
                     }}
                     
                     // 👇 [Fix] 공유 버튼 연결 (임시로 alert라도 뜨게)
@@ -670,105 +692,28 @@ export default function BambooForest() {
         />
         <FullImageViewer image={selectedImage} onClose={() => setSelectedImage(null)} />
 
-        {/* Mailbox (Overlay) */}
+        {/* Mailbox (Clean Modal Component) */}
         <AnimatePresence>
             {showMailbox && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[60] bg-black/80 backdrop-blur-xl flex items-center justify-center p-6 pointer-events-auto">
-                    <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="w-full max-w-lg bg-[#1a1a1a] border border-[#333] rounded-2xl overflow-hidden shadow-2xl relative">
-                        <div className="absolute inset-0 opacity-5 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] pointer-events-none" />
-                        <div className="p-8 relative z-10">
-                            <div className="flex justify-between items-center mb-8"><h2 className="text-yellow-100/80 text-lg font-serif italic tracking-wider">Soul Letters</h2><button onClick={() => setShowMailbox(false)}><X className="text-white/30 hover:text-white" /></button></div>
-                            <div className="space-y-4 max-h-[60vh] overflow-y-auto no-scrollbar">{engine.letters.length === 0 ? (<div className="text-center py-10 text-white/30 font-light text-sm"><p>아직 도착한 편지가 없습니다.</p><p className="mt-2 text-[10px]">달이 차오르면 정령이 편지를 보낼 것입니다.</p></div>) : (engine.letters.map((letter: any) => (<motion.div key={letter.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white/5 border border-white/5 p-6 rounded-xl cursor-pointer hover:bg-white/10 transition-colors group" onClick={() => setSelectedLetter(letter)}><div className="flex justify-between items-baseline mb-2"><span className="text-yellow-500/80 text-xs font-mono uppercase tracking-widest">{letter.month}의 기록</span><span className="text-white/20 text-[10px]">{new Date(letter.created_at).toLocaleDateString()}</span></div><p className="text-white/60 text-sm line-clamp-2 font-serif italic group-hover:text-white/80 transition-colors">{letter.content}</p></motion.div>)))}</div>
-                        </div>
-                    </motion.div>
-                </motion.div>
+                <MailboxModal 
+                    isOpen={showMailbox}
+                    onClose={() => setShowMailbox(false)}
+                    letters={engine.letters}
+                    onShare={engine.openSoulography}
+                />
             )}
         </AnimatePresence>
 
-        <AnimatePresence>
-            {selectedLetter && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-[70] bg-black flex items-center justify-center p-4 md:p-12 pointer-events-auto">
-                    <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="max-w-2xl w-full bg-[#0c0c0c] border border-[#222] p-8 md:p-16 rounded-sm shadow-2xl relative">
-                        <button onClick={() => setSelectedLetter(null)} className="absolute top-6 right-6 text-white/20 hover:text-white"><X /></button>
-                        <div className="text-center mb-12"><Sparkles className="w-6 h-6 text-yellow-500/50 mx-auto mb-4" /><h3 className="text-white/40 text-xs font-mono uppercase tracking-[0.3em]">{selectedLetter.month}</h3></div>
-                        <p className="text-white/80 font-serif text-lg md:text-xl leading-relaxed whitespace-pre-wrap text-justify">{selectedLetter.content}</p>
-                        
-                        {/* [New] 하단 서명 및 공유 버튼 */}
-                        <div className="mt-12 flex justify-between items-end border-t border-white/5 pt-6">
-                            {/* 공유 버튼 */}
-                            <button 
-                                onClick={() => engine.openSoulography('letter', selectedLetter)} // 👈 [New] 연결
-                                className="flex items-center gap-2 text-xs text-white/30 hover:text-purple-300 transition-colors uppercase tracking-widest group"
-                            >
-                                <Share2 size={14} className="group-hover:text-purple-300 transition-colors" />
-                                Share Letter
-                            </button>
-                            
-                            {/* 서명 */}
-                            <p className="text-white/30 text-xs font-serif italic">- 숲의 정령</p>
-                      </div>                    
-                        </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
-
-        {/* Journal Layer */}
+        {/* Journal Layer (The Star Archives) */}
         <AnimatePresence>
           {engine.showJournal && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-40 bg-black/90 backdrop-blur-xl pointer-events-auto">
-              <div className="absolute top-8 right-20 z-50 flex gap-2"><button onClick={() => { engine.triggerLight(); setViewMode(viewMode === 'stars' ? 'orbit' : 'stars'); }} className="p-3 bg-white/10 rounded-full hover:bg-white/20 text-white/70 transition-all flex items-center gap-2 border border-white/5">{viewMode === 'stars' ? <LayoutGrid size={20} /> : <Star size={20} />}<span className="text-[10px] uppercase tracking-widest hidden md:block">{viewMode === 'stars' ? 'Orbit View' : 'Star View'}</span></button></div>
-              {/* [New] 2. Close Button (새로 추가할 버튼 - 위치: right-8) */}
-              <button 
-                  onClick={() => { engine.triggerLight(); engine.setShowJournal(false); }} 
-                  className="absolute top-8 right-8 z-50 p-3 bg-white/10 rounded-full hover:bg-white/20 text-white/70 hover:text-white transition-all border border-white/5"
-              >
-                  <X size={20} />
-              </button>
-              {viewMode === 'stars' ? (
-                  <>
-                    <ConstellationLayer memories={processedMemories} />
-                    {processedMemories.map((item, index) => {
-                      const memory = item as Memory & { x: number; y: number; unlock_date?: string };
-                      const isTimeCapsule = !!memory.unlock_date; 
-                      const isLocked = isTimeCapsule && new Date(memory.unlock_date!) > new Date(); 
-                      return (
-                        <motion.button key={memory.id} layoutId={`memory-container-${memory.id}`} className="absolute flex items-center justify-center group -translate-x-1/2 -translate-y-1/2" style={{ top: `${memory.y}%`, left: `${memory.x}%`, zIndex: selectedMemory?.id === memory.id ? 50 : 10 }} onClick={() => { if (isLocked) { alert(`이 기억은 ${new Date(memory.unlock_date!).toLocaleDateString()}에 깨어납니다.`); } else { engine.playMagicDust(); engine.triggerLight(); setSelectedMemory(memory); } }} initial={{ scale: 0, opacity: 0, rotate: -45 }} animate={{ scale: 1, opacity: 1, rotate: isLocked ? 0 : 0, y: isLocked ? [0, 3, 0] : 0 }} transition={{ default: { delay: index * 0.1, type: "spring", stiffness: 200, damping: 15 }, y: { duration: 4, repeat: Infinity, ease: "easeInOut" } }}>
-                          <div className="relative hover:scale-125 transition-transform duration-300">{isTimeCapsule && isLocked ? ( <GoldenCocoon isLocked={true} /> ) : ( <> <MemoryFlower emotion={memory.emotion} isSelected={selectedMemory?.id === memory.id} /> <div className={`absolute inset-0 blur-md opacity-40 animate-pulse ${memory.emotion === 'anger' ? 'bg-red-500' : memory.emotion === 'sadness' ? 'bg-blue-500' : 'bg-yellow-200'}`} /> </> )}</div>
-                        </motion.button>
-                      );
-                    })}
-                  </>
-              ) : (
-                  <OrbitLayer memories={memories} onSelect={(m) => { engine.playMagicDust(); engine.triggerLight(); setSelectedMemory(m); }} />
-              )}
-
-              <AnimatePresence>
-                {selectedMemory && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50">
-                      <div className="absolute inset-0 pointer-events-auto" onClick={() => setSelectedMemory(null)} />
-                      <motion.div key="memory-card" layoutId={`memory-container-${selectedMemory.id}`} className="relative w-[90%] md:w-[400px] bg-gradient-to-br from-gray-900/90 to-black/90 backdrop-blur-3xl border border-white/10 p-8 rounded-3xl shadow-2xl overflow-hidden cursor-auto pointer-events-auto" transition={{ type: "spring", stiffness: 300, damping: 30 }}>
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.4 }}>
-                            <div className="absolute top-3 left-0 right-0 flex justify-center opacity-30"><div className="w-12 h-1 bg-white rounded-full" /></div>
-                            <div className="absolute -top-20 -left-20 w-40 h-40 bg-purple-500/20 blur-[80px] pointer-events-none" />
-                            <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-blue-500/20 blur-[80px] pointer-events-none" />
-                            <div className="absolute top-8 right-8 opacity-20 pointer-events-none transform scale-150"><MemoryFlower emotion={selectedMemory.emotion} isSelected={true} /></div>
-                            <div className="relative z-10 mt-4">
-                                <p className="text-xs text-white/50 mb-4 font-mono tracking-[0.2em] uppercase">{new Date(selectedMemory.created_at).toLocaleDateString()} — {selectedMemory.emotion?.toUpperCase() || 'MEMORY'}</p>
-                                <p className="text-white/90 font-light text-lg leading-relaxed italic">"{selectedMemory.summary}"</p>
-                                {selectedMemory.audio_url && (<div className="mt-6 p-4 bg-white/5 rounded-xl border border-white/10"><div className="flex items-center gap-3 mb-2"><Headphones size={16} className="text-yellow-200" /><span className="text-[10px] text-yellow-200/80 uppercase tracking-widest">Voice from the past</span></div><audio src={selectedMemory.audio_url} controls className="w-full h-8 opacity-80" /></div>)}
-                            </div>
-                            <button onClick={() => setSelectedMemory(null)} className="absolute top-4 right-4 text-white/20 hover:text-white transition-colors"><X size={20} /></button>
-                            <div className="flex gap-3 mt-8 justify-end">
-                                <motion.button onClick={() => engine.deleteMemory(selectedMemory.id)} disabled={engine.isDeleting === selectedMemory.id} className="p-3 bg-red-500/10 rounded-full hover:bg-red-500/20 text-red-200/70 hover:text-red-200 transition-all disabled:opacity-50" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>{engine.isDeleting === selectedMemory.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}</motion.button>
-                                <motion.button onClick={() => engine.shareMemory(selectedMemory)} disabled={engine.capturingId === selectedMemory.id} className="p-3 bg-white/10 rounded-full hover:bg-white/20 text-white/70 hover:text-white transition-all disabled:opacity-50" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>{engine.capturingId === selectedMemory.id ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}</motion.button>
-                            </div>
-                        </motion.div>
-                      </motion.div>
-                  </div>
-                )}
-              </AnimatePresence>
-              {memories.length === 0 && <div className="absolute inset-0 flex items-center justify-center text-white/30 font-light pointer-events-none"><p>아직 피어난 꽃이 없어.</p></div>}
-            </motion.div>
+            <JournalModal 
+                isOpen={engine.showJournal}
+                onClose={() => engine.setShowJournal(false)}
+                memories={engine.memories}
+                processedMemories={processedMemories}
+                engine={engine}
+            />
           )}
         </AnimatePresence>
         </motion.div>
