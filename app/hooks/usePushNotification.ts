@@ -1,8 +1,16 @@
 // app/hooks/usePushNotification.ts
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { getFCMToken } from '../lib/firebase';
+import { supabase } from '../utils/supabase';
 
 export function usePushNotification() {
     const [permission, setPermission] = useState<NotificationPermission>('default');
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+            setPermission(Notification.permission);
+        }
+    }, []);
 
     const requestPermission = useCallback(async () => {
         if (!('Notification' in window)) {
@@ -10,25 +18,33 @@ export function usePushNotification() {
             return;
         }
 
-        const result = await Notification.requestPermission();
-        setPermission(result);
+        try {
+            const token = await getFCMToken();
+            
+            if (token) {
+                setPermission('granted');
+                console.log("FCM Token:", token);
+                
+                // [Sync] 토큰을 Supabase 'profiles' 테이블에 저장
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    await supabase.from('profiles').update({ 
+                        fcm_token: token 
+                    }).eq('id', user.id);
+                }
 
-        if (result === 'granted') {
-            // [Demo] 권한 허용 즉시 테스트 알림 발송 (사용자 확인용)
-            new Notification("숲의 정령", {
-                body: "연결되었습니다. 당신의 마음을 기다릴게요.",
-                icon: "/icons/icon-192x192.png", // PWA 아이콘 경로 확인 필요
-            });
+                // 환영 알림 테스트
+                new Notification("숲의 정령", {
+                    body: "당신의 영혼과 연결되었습니다. 이제 숲이 당신을 찾아갑니다.",
+                    icon: "/icons/icon-192x192.png",
+                });
+            } else {
+                setPermission('denied');
+            }
+        } catch (e) {
+            console.error("Push Permission Error:", e);
         }
     }, []);
 
-    // 실제로는 서버에서 Push를 보내겠지만, 여기서는 클라이언트 스케줄링 시뮬레이션
-    const scheduleDailyReminder = useCallback(() => {
-        if (permission !== 'granted') return;
-        
-        // (실제 프로덕션에서는 Service Worker와 백엔드 Cron Job으로 처리해야 함)
-        console.log("🔔 [System] Daily Whisper Scheduled");
-    }, [permission]);
-
-    return { permission, requestPermission, scheduleDailyReminder };
+    return { permission, requestPermission };
 }

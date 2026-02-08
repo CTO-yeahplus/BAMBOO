@@ -1,12 +1,7 @@
 // app/hooks/usePresence.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../utils/supabase';
 import { FireflyUser } from '../types';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 const PRESET_COLORS = ['#FCD34D', '#60A5FA', '#F472B6', '#A78BFA', '#34D399'];
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Square, Trash2, Send, Clock, Lock } from 'lucide-react';
+import { Mic, Square, Trash2, Clock, Lock, Sparkles } from 'lucide-react'; // Sparkles 아이콘 추가
 
 interface MemoryRitualProps {
     isOpen: boolean;
@@ -20,6 +20,11 @@ export const MemoryRitual = ({
     const [isRecording, setIsRecording] = useState(false);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    
+    // [New] Organic Interaction States (꾹 누르기 상태)
+    const [isHolding, setIsHolding] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const holdTimer = useRef<NodeJS.Timeout | null>(null);
     
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
@@ -68,7 +73,55 @@ export const MemoryRitual = ({
         setAudioBlob(null);
         setAudioUrl(null);
         setPendingSummary("");
+        setProgress(0);
+        setIsHolding(false);
+        if (holdTimer.current) clearInterval(holdTimer.current);
         onClose();
+    };
+
+    // [New] 꾹 누르기 핸들러 (Hold to Release)
+    const handlePressStart = () => {
+        // 내용이 없으면 반응하지 않음 (안전장치)
+        if (!pendingSummary.trim() && !audioBlob) return; 
+        
+        setIsHolding(true);
+        setProgress(0);
+
+        let tick = 0;
+        // 10ms마다 0.5%씩 증가 -> 약 2초 소요 (100 / 0.5 * 10 = 2000ms)
+        holdTimer.current = setInterval(() => {
+            tick += 0.5;
+            setProgress(tick);
+            
+            // 햅틱 피드백: 게이지가 찰수록 더 자주 진동 (선택 사항)
+            if (tick % 20 === 0 && navigator.vibrate) {
+                navigator.vibrate(10); 
+            }
+
+            if (tick >= 100) {
+                // 완료!
+                clearInterval(holdTimer.current!);
+                handleRelease();
+            }
+        }, 10);
+    };
+
+    const handlePressEnd = () => {
+        if (progress < 100) {
+            // 중도 포기 (손을 떼거나 마우스가 벗어남) -> 초기화
+            setIsHolding(false);
+            setProgress(0);
+            if (holdTimer.current) clearInterval(holdTimer.current);
+        }
+    };
+
+    const handleRelease = () => {
+        // 전송 성공 효과
+        if (navigator.vibrate) navigator.vibrate([50, 100, 50]); // 징-징-징
+        
+        // 전송 로직 실행
+        onFinalize('standard', pendingSummary, user.id);
+        resetAndClose();
     };
 
     return (
@@ -112,32 +165,72 @@ export const MemoryRitual = ({
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <button onClick={() => { onFinalize('standard', pendingSummary, user.id); resetAndClose(); }} className="group flex flex-col items-center gap-3 p-4 rounded-2xl bg-white/5 hover:bg-blue-500/10 border border-white/10 hover:border-blue-500/30 transition-all">
-                                <div className="p-3 bg-blue-500/20 rounded-full text-blue-200 group-hover:scale-110 transition-transform"><Send size={20} /></div>
-                                <span className="text-white/60 text-[10px] uppercase tracking-wider group-hover:text-white">Release</span>
-                            </button>
+                        {/* 👇 [Modified] Organic Interaction Area */}
+                        <div className="flex flex-col items-center gap-8">
+                            
+                            {/* Hold-to-Release Button */}
+                            <div className="relative group">
+                                {/* Charging Glow Effect */}
+                                {isHolding && (
+                                    <motion.div 
+                                        className="absolute inset-0 rounded-full bg-blue-500/40 blur-xl"
+                                        initial={{ scale: 1, opacity: 0 }}
+                                        animate={{ scale: 1.5, opacity: 1 }}
+                                        transition={{ duration: 2 }} // 2초 동안 커짐
+                                    />
+                                )}
+                                
+                                <button
+                                    // 마우스/터치 이벤트 바인딩
+                                    onMouseDown={handlePressStart}
+                                    onMouseUp={handlePressEnd}
+                                    onMouseLeave={handlePressEnd}
+                                    onTouchStart={handlePressStart}
+                                    onTouchEnd={handlePressEnd}
+                                    
+                                    // 스타일링
+                                    className="relative w-24 h-24 rounded-full bg-gradient-to-br from-blue-900/40 to-slate-900/40 border border-blue-500/30 flex items-center justify-center shadow-lg overflow-hidden select-none transition-transform active:scale-95"
+                                >
+                                    {/* Progress Background (차오르는 물) */}
+                                    <motion.div 
+                                        className="absolute bottom-0 left-0 right-0 bg-blue-500/30 backdrop-blur-sm"
+                                        style={{ height: `${progress}%` }}
+                                        transition={{ ease: "linear", duration: 0 }} // 즉각 반응
+                                    />
+                                    
+                                    {/* Icon & Text */}
+                                    <div className="relative z-10 flex flex-col items-center gap-1">
+                                        {progress >= 100 ? (
+                                            <Sparkles className="text-white animate-spin" size={28} />
+                                        ) : (
+                                            <span className="text-2xl drop-shadow-md">🦋</span>
+                                        )}
+                                        <span className="text-[9px] text-blue-200/80 uppercase tracking-widest font-medium">
+                                            {isHolding ? "Holding..." : "Hold"}
+                                        </span>
+                                    </div>
+                                </button>
+                            </div>
 
-                            <button
-                                onClick={() => {
-                                    if (isPremium) {
+                            {/* Capsule Button (작게 배치) */}
+                            {isPremium && (
+                                <button
+                                    onClick={() => {
                                         if (audioBlob) handleSaveCapsule();
                                         else alert("먼저 목소리를 녹음해주세요.");
-                                    } else {
-                                        alert("성소 멤버십이 필요한 기능입니다.");
-                                    }
-                                }}
-                                className={`group flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all ${isPremium ? (audioBlob ? 'bg-yellow-500/10 border-yellow-500/50 cursor-pointer' : 'bg-white/5 hover:bg-yellow-500/10 border-white/10 hover:border-yellow-500/30') : 'bg-black/40 border-white/5 opacity-50 cursor-not-allowed'}`}
-                            >
-                                <div className={`p-3 rounded-full transition-transform group-hover:scale-110 ${isPremium ? 'bg-yellow-500/20 text-yellow-200' : 'bg-white/5 text-white/20'}`}>
-                                    {isPremium ? <Clock size={20} /> : <Lock size={20} />}
-                                </div>
-                                <span className={`text-[10px] uppercase tracking-wider ${isPremium ? 'text-white/60 group-hover:text-white' : 'text-white/20'}`}>
-                                    {audioBlob ? "Bury Capsule" : "Time Capsule"}
-                                </span>
-                            </button>
+                                    }}
+                                    className="flex items-center gap-2 text-xs text-yellow-500/50 hover:text-yellow-500 transition-colors uppercase tracking-widest group"
+                                >
+                                    {audioBlob ? (
+                                        <><Clock size={14} className="group-hover:animate-pulse" /> Bury Time Capsule</>
+                                    ) : (
+                                        <><Lock size={14} /> Record to bury capsule</>
+                                    )}
+                                </button>
+                            )}
                         </div>
-                        <div className="mt-6 text-center">
+
+                        <div className="mt-8 text-center">
                             <button onClick={resetAndClose} className="text-white/20 text-[10px] hover:text-white/50 transition-colors uppercase tracking-widest">Discard Memory</button>
                         </div>
                     </motion.div>

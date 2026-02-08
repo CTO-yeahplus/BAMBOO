@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
-import { Book, X, Star, Share2, Disc, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Settings2, Volume2, Mic, LogIn, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, Keyboard, SendHorizontal, Palette, Mail, Moon, Bed, Square, PenTool, ImageIcon } from 'lucide-react';
+import { Book, X, Star, Share2, Disc, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Settings2, Volume2, Mic, LogIn, Flame, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, Keyboard, SendHorizontal, Palette, Mail, Moon, Bed, Square, PenTool, ImageIcon } from 'lucide-react';
 import { MemoryGalleryModal, FullImageViewer } from './components/MemoryGalleryModal';
 import { useBambooEngine } from './hooks/useBambooEngine';
 import { useRipple } from './hooks/useRipple';
@@ -11,15 +11,15 @@ import { Memory, WeatherType, Particle, THEMES } from './types';
 import { getMoonPhase, getMoonIconPath } from './utils/moonPhase';
 import { InstallPrompt } from './components/InstallPrompt';
 import { ForestGuide } from './components/ForestGuide';
+import { supabase } from './utils/supabase'; 
+import { IntroSequence } from './components/IntroSequence';
 
 // Components
-import { ForestBackground, SpringPetal, SummerFirefly, AutumnLeaf, ConstellationLayer, OrbitLayer, MemoryFlower, GoldenCocoon, FireflyLayer, SoulTree, FloatingBottle, SpiritWisp, SpiritFox, SpiritGuardian } from './components/ForestVisuals';
-import { OracleModal, SettingsModal, AltarModal, ProfileModal, BottleMenuModal, BottleWriteModal, BottleReadModal, FireRitualModal, SoulCalendarModal } from './components/ForestModals';
+import { MemoryLantern, ForestBackground, LivingSpirit, SpiritRenderer, SoulTree, FireflyLayer, FloatingBottle, BurningPaperEffect, MemoryFlower, GoldenCocoon, SpringPetal, SummerFirefly, AutumnLeaf, ConstellationLayer, OrbitLayer} from './components/visuals';
+import { OracleModal, SettingsModal, AltarModal, ProfileModal, BottleModals, FireRitualModal, SoulCalendarModal, SoulographyModal, SpiritCapsuleModal} from './components/modals'; // index.ts 덕분에 폴더명만 써도 됨
 import { MemoryRitual } from './components/MemoryRitual';
 import { TimeCapsuleModal } from './components/TimeCapsuleModal';
-import { SoulographyModal } from './components/ForestModals';
 import { GenesisRitual } from './components/GenesisRitual';
-import { SpiritCapsuleModal } from './components/ForestModals';
 
 // [New] UI Components
 import { MagicSatchel, MinimalAmbience } from './components/ForestControls';
@@ -30,6 +30,7 @@ const SOUL_LEVELS: { [key: number]: { name: string, color: string } } = { 1: { n
 
 export default function BambooForest() {
   const engine = useBambooEngine();
+  const [showIntro, setShowIntro] = useState(true); // 👈 인트로 상태 추가
   
   const { 
     user, isPremium, memories, 
@@ -59,6 +60,7 @@ export default function BambooForest() {
   const [whisperIndex, setWhisperIndex] = useState(0);
   const [inputText, setInputText] = useState("");
   const [particles, setParticles] = useState<Particle[]>([]);
+  
   
   // Intro Visibility State
   const [introVisible, setIntroVisible] = useState(true);
@@ -115,9 +117,17 @@ export default function BambooForest() {
 
   // 시네마틱 애니메이션 설정 (아주 부드러운 전환)
   const cinematicTransition = { duration: 2.5, ease: "easeInOut" } as const;
+  // [Fix] 캘린더가 열릴 때, 해당 월의 감정 데이터를 가져옵니다.
+  useEffect(() => {
+    if (engine.showCalendar) {
+        console.log(`📅 Calendar Opened: Fetching data for ${engine.calYear}-${engine.calMonth}`);
+        engine.fetchMonthlyMoods(engine.calYear, engine.calMonth);
+    }
+  }, [engine.showCalendar]);
 
   return (
     <main className="relative flex flex-col items-center justify-center w-full h-screen overflow-hidden bg-black touch-none" onMouseMove={(e) => {}} onPointerDown={handleGlobalClick}>
+      
       {/* [Critical Fix] ID 직통 케이블 연결 (오디오 레이어) */}
         <div style={{ display: 'none' }}>
           <audio 
@@ -161,6 +171,17 @@ export default function BambooForest() {
               loop playsInline 
           />
         </div>
+
+        {/* 🎬 Intro Layer */}
+        {showIntro && <IntroSequence onComplete={() => setShowIntro(false)} />}
+
+        {/* 🌲 Main Content (인트로가 끝날 때 부드럽게 등장) */}
+        <motion.div 
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: showIntro ? 0 : 1 }} // 인트로 끝나면 1
+            transition={{ duration: 2 }} // 2초 동안 천천히 밝아짐
+        >
         {/* [New] Genesis Ritual (Onboarding) */}
         <AnimatePresence>
           {engine.showOnboarding && (
@@ -238,38 +259,63 @@ export default function BambooForest() {
             transition={cinematicTransition}
         />
 
-          {/* Spirit & Tree Container */}
-          <motion.div className={`absolute inset-0 flex items-center justify-center ${!hasWoken ? 'cursor-pointer z-30' : 'z-30'}`} style={{ x: spiritX, y: spiritY }}>
-              {/* 나무(SoulTree)도 배경의 일부이므로 isFocusMode일 때 흐려짐 */}
-             <motion.div animate={{ filter: isFocusMode ? "blur(4px)" : "blur(0px)" }} transition={cinematicTransition}>
-                <SoulTree resonance={resonance} memories={memories} />
+        {/* Spirit & Tree Container */}
+        <motion.div 
+              className={`absolute inset-0 flex items-center justify-center ${!hasWoken ? 'cursor-pointer z-30' : 'z-30'}`} 
+              style={{ x: spiritX, y: spiritY }}
+          >
+              <motion.div animate={{ filter: isFocusMode ? "blur(4px)" : "blur(0px)" }} transition={cinematicTransition}>
+                <SoulTree resonance={engine.resonance} memories={engine.memories} />
              </motion.div>
+             {/* 👇 [여기에 추가] 장착된 아티팩트 (기억의 등불) 렌더링 */}
+            {engine.equippedItems.artifacts?.includes('artifact_lantern') && (
+                <MemoryLantern 
+                    onClick={() => {
+                        const randomMemory = engine.memories[Math.floor(Math.random() * engine.memories.length)];
+                        if (randomMemory) {
+                            // 여기에 토스트 메시지나 음성 안내를 넣으면 더 좋습니다.
+                            alert(`💡 기억의 등불이 속삭입니다:\n"${randomMemory.summary}"`);
+                        } else {
+                            alert("아직 등불에 담을 기억이 없습니다.");
+                        }
+                    }} 
+                />
+            )}
+              
+              {/* 👇 [NEW] Living Spirit Visualizer */}
               <motion.div 
-                  className="relative z-10 w-[280px] h-[380px] md:w-[400px] md:h-[550px] flex items-center justify-center transition-all duration-300 pointer-events-auto" 
-                  style={{ scale: engine.isBreathing || engine.isHolding ? 1 : spiritScale, filter: spiritGlow as any }} 
-                  animate={isSilentMode ? { scale: 1.15, y: 20 } : !hasWoken ? { scale: 0.95, y: [0, 5, 0] } : { scale: 1.05, y: 0 }} 
-                  transition={{ duration: 4, ease: "easeInOut" }} 
+                  className="relative z-10 flex items-center justify-center transition-all duration-300 pointer-events-auto"
                   onClick={handleSpiritClick} 
                   onPan={(e, info) => { if(hasWoken) engine.handlePet(); }} 
                   onPointerDown={() => engine.setIsHolding(true)} 
                   onPointerUp={() => engine.setIsHolding(false)}
+                  // 등장 애니메이션 (안개 속에서 피어오름)
+                  initial={{ opacity: 0, scale: 0.8, filter: "blur(20px)" }}
+                  animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                  transition={{ duration: 2, ease: "easeOut" }}
               >
-                  {/* Spirit Forms */}
-                  {spiritForm === 'wisp' && (<div className="scale-150 cursor-pointer"><SpiritWisp /></div>)}
-                  {spiritForm === 'fox' && (<div className="scale-125 cursor-pointer"><SpiritFox /></div>)}
-                  {spiritForm === 'guardian' && (
-                      <SpiritGuardian 
-                          resonance={motionValues.springVolume} 
-                          isBreathing={engine.isBreathing}
-                          isHolding={engine.isHolding}
-                          spiritGlowOpacity={spiritGlowOpacity}
-                          equippedItems={engine.equippedItems}
-                      />
-                  )}
+                  <LivingSpirit 
+                      emotion={engine.currentEmotion || 'neutral'} // engine에 currentEmotion 추가 필요 (없으면 neutral)
+                      volume={motionValues.springVolume}
+                      isTalking={['speaking', 'listening'].includes(callStatus)}
+                      form={spiritForm}
+                  />
 
-                  {/* Spirit Overlays */}
-                  {!hasWoken && <div className="absolute inset-0 flex flex-col items-center justify-center z-50"><motion.div initial={{ opacity: 0 }} animate={{ opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 3, repeat: Infinity }} className="flex flex-col items-center gap-4"><MousePointerClick className="text-white/50 w-12 h-12" /><p className="text-white/60 font-light text-sm tracking-[0.2em] uppercase">Touch to awaken</p></motion.div></div>}
-                  {engine.isBreathing && <div className="absolute inset-0 flex items-center justify-center z-50"><motion.p className="text-white/90 font-light text-xl tracking-[0.4em] uppercase drop-shadow-lg" animate={{ opacity: [0, 1, 1, 0], scale: [0.9, 1.1, 1.1, 0.9] }} transition={{ duration: 19, times: [0, 0.2, 0.8, 1], repeat: Infinity }}>Breathe</motion.p></div>}
+                  {/* 텍스트 오버레이 (Touch to awaken) */}
+                  {!hasWoken && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center z-50">
+                          <motion.div 
+                              initial={{ opacity: 0 }} 
+                              animate={{ opacity: [0.3, 0.8, 0.3] }} 
+                              transition={{ duration: 3, repeat: Infinity }} 
+                              className="flex flex-col items-center gap-4"
+                          >
+                              <p className="text-white/60 font-light text-xs tracking-[0.4em] uppercase font-serif">
+                                  Touch the Light
+                              </p>
+                          </motion.div>
+                      </div>
+                  )}
               </motion.div>
           </motion.div>
 
@@ -347,7 +393,7 @@ export default function BambooForest() {
                   onCollectDew={engine.collectDew}
                   onOpenFire={() => setShowFireRitual(true)}
                   //onOpenBottle={() => setShowWriteBottle(true)}
-                  onOpenBottle={() => engine.setShowBottleMenu(true)}
+                  onOpenBottle={() => engine.setWhisperOpen(true)}
                   onOpenCapsule={() => setShowCapsuleModal(true)}
                   onOpenGallery={() => engine.setShowGalleryModal(true)}
                   onOpenCalendar={() => engine.setShowCalendar(true)}
@@ -368,13 +414,29 @@ export default function BambooForest() {
                 />
 
                 <SoulCalendarModal 
-                  isOpen={engine.showCalendar} 
-                  onClose={() => engine.setShowCalendar(false)}
-                  moods={engine.monthlyMoods}
-                  currentYear={engine.calYear}
-                  currentMonth={engine.calMonth}
-                  onMonthChange={(y, m) => { engine.setCalYear(y); engine.setCalMonth(m); }}
-                  onShare={engine.openSoulography}
+                    isOpen={engine.showCalendar} 
+                    onClose={() => engine.setShowCalendar(false)}
+                    
+                    // 상태 전달
+                    currentYear={engine.calYear}
+                    currentMonth={engine.calMonth}
+                    moods={engine.monthlyMoods}
+                    
+                    // 👇 [Fix] 달을 변경할 때: 1.숫자 변경 + 2.데이터 새로고침
+                    onMonthChange={(year, month) => {
+                        engine.setCalYear(year);
+                        engine.setCalMonth(month);
+                        engine.fetchMonthlyMoods(year, month); // 이 줄이 있어야 데이터가 바뀝니다!
+                    }}
+                    
+                    // 👇 [Fix] 공유 버튼 연결 (임시로 alert라도 뜨게)
+                    onShare={(type, data) => {
+                        if (engine.openSoulography) {
+                            engine.openSoulography(type, data);
+                        } else {
+                            alert("공유 기능 준비 중입니다.");
+                        }
+                    }}
                 />
                 
                 {/* Left Bottom: Settings */}
@@ -392,19 +454,32 @@ export default function BambooForest() {
 
         {/* [New] 'Capture' Button (정령의 말 저장 UI) */}
         {engine.spiritMessage && (
-            <div className="absolute bottom-32 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
-                {/* 자막 컨테이너: pointer-events-auto로 설정하여 이 부분만 클릭 가능하게 함 */}
-                <div className="pointer-events-auto bg-black/40 backdrop-blur-md border border-white/10 px-8 py-5 rounded-2xl max-w-md w-full text-center relative group shadow-2xl transition-all duration-500 hover:bg-black/60 hover:border-white/20">
+            <div className="absolute top-[15%] left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
+                {/* [Fix 1] onClick 추가: 이 박스를 누르면 메시지가 닫힙니다.
+                    [Fix 2] cursor-pointer 추가: 클릭 가능하다는 것을 알려줍니다.
+                */}
+                <div 
+                    onClick={() => engine.setSpiritMessage(null)} 
+                    className="pointer-events-auto cursor-pointer bg-black/40 backdrop-blur-md border border-white/10 px-8 py-5 rounded-2xl max-w-md w-full text-center relative group shadow-2xl transition-all duration-500 hover:bg-black/60 hover:border-white/20"
+                >
                     
                     {/* 정령의 메시지 텍스트 */}
-                    <p className="text-white/90 font-serif text-sm md:text-base leading-relaxed drop-shadow-md animate-fade-in">
+                    <p className="text-white/90 font-serif text-sm md:text-base leading-relaxed drop-shadow-md animate-fade-in select-none">
                         {engine.spiritMessage}
+                    </p>
+                    
+                    {/* 닫기 힌트 (선택 사항: 사용자에게 알려줌) */}
+                    <p className="text-[10px] text-white/30 mt-2 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                        Tap to dismiss
                     </p>
                     
                     {/* 캡슐 저장 버튼 (컨테이너에 호버 시 등장) */}
                     <button 
-                        onClick={() => engine.keepSpiritVoice(engine.spiritMessage!)} 
-                        className="absolute -top-3 -right-3 bg-gradient-to-br from-purple-600 to-indigo-600 text-white p-2.5 rounded-full shadow-[0_0_15px_rgba(124,58,237,0.5)] opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 transition-all duration-300 hover:scale-110 hover:brightness-110 active:scale-95"
+                        onClick={(e) => {
+                            e.stopPropagation(); // 👈 [중요] 부모의 '닫기' 클릭 이벤트를 막습니다. (저장 버튼만 눌리게 함)
+                            engine.keepSpiritVoice(engine.spiritMessage!);
+                        }} 
+                        className="absolute -top-3 -right-3 bg-gradient-to-br from-purple-600 to-indigo-600 text-white p-2.5 rounded-full shadow-[0_0_15px_rgba(124,58,237,0.5)] opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2 transition-all duration-300 hover:scale-110 hover:brightness-110 active:scale-95 cursor-pointer pointer-events-auto"
                         title="이 속삭임을 기억 조각으로 보관하기"
                     >
                         {/* LP판처럼 천천히 돌아가는 아이콘 */}
@@ -417,9 +492,73 @@ export default function BambooForest() {
             </div>
         )}
         </motion.div>
-
         </ForestBackground>
-        
+
+        {/* 👇 [New] 불타는 의식 시각 효과 (Fire Overlay) */}
+        <AnimatePresence>
+            {engine.isBurning && (
+                <motion.div 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    exit={{ opacity: 0, transition: { duration: 1 } }}
+                    className="absolute inset-0 z-[200] pointer-events-none flex items-center justify-center"
+                >
+                    {/* 1. 전체 붉은 섬광 (화면 깜빡임) */}
+                    <motion.div 
+                        className="absolute inset-0 bg-orange-600/30 mix-blend-hard-light"
+                        animate={{ opacity: [0.2, 0.6, 0.2] }}
+                        transition={{ duration: 0.2, repeat: Infinity, repeatType: "mirror" }}
+                    />
+                    
+                    {/* 2. 하단에서 올라오는 붉은 그라데이션 */}
+                    <motion.div 
+                        className="absolute inset-0 bg-gradient-to-t from-red-900/80 via-orange-600/20 to-transparent"
+                        initial={{ y: "100%" }}
+                        animate={{ y: "0%" }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                    />
+
+                    {/* 3. 중앙 불꽃 심볼 (선택 사항) */}
+                    <motion.div
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: [1, 1.2, 1], opacity: 1 }}
+                        exit={{ scale: 1.5, opacity: 0 }}
+                        transition={{ duration: 3 }}
+                        className="relative z-10"
+                    >
+                         <div className="relative">
+                            <div className="absolute inset-0 bg-orange-500 blur-[60px] animate-pulse" />
+                            <Flame size={120} className="text-white drop-shadow-[0_0_30px_rgba(255,100,0,1)]" />
+                         </div>
+                         <p className="text-center text-orange-100 font-serif tracking-[0.5em] text-sm mt-8 opacity-80">
+                            PURIFYING...
+                         </p>
+                    </motion.div>
+
+                    {/* 4. 불티 파티클 (간단 효과) */}
+                    {[...Array(20)].map((_, i) => (
+                        <motion.div
+                            key={i}
+                            className="absolute w-1 h-1 bg-orange-300 rounded-full"
+                            initial={{ 
+                                x: Math.random() * window.innerWidth, 
+                                y: window.innerHeight 
+                            }}
+                            animate={{ 
+                                y: -100,
+                                x: Math.random() * window.innerWidth + (Math.random() - 0.5) * 200,
+                                opacity: [1, 0]
+                            }}
+                            transition={{ 
+                                duration: Math.random() * 2 + 1, 
+                                ease: "easeOut",
+                                delay: Math.random() * 0.5 
+                            }}
+                        />
+                    ))}
+                </motion.div>
+            )}
+        </AnimatePresence>
 
         {/* --- MODALS --- */}
         {/* 👇 DailyOracleModal 연결 수정 */}
@@ -432,10 +571,25 @@ export default function BambooForest() {
         />        
         <SettingsModal 
             isOpen={engine.showSettings} 
-            onClose={() => engine.setShowSettings(false)} 
-            bgVolume={bgVolume} setBgVolume={engine.setBgVolume} 
-            voiceVolume={voiceVolume} setVoiceVolume={engine.setVoiceVolume}
+            onClose={() => engine.setShowSettings(false)}
+            user={user}
+            // 👇 [Fix] 볼륨 3형제를 모두 전달해야 믹서가 작동합니다!
+            volume={engine.volume}
+            setVolume={engine.setVolume}
             isMixerMode={engine.isMixerMode}
+            bgVolume={engine.bgVolume}         // 배경음 볼륨
+            setBgVolume={engine.setBgVolume}   // 배경음 조절 함수
+            voiceVolume={engine.voiceVolume}       // 정령 목소리 볼륨
+            setVoiceVolume={engine.setVoiceVolume} // 정령 목소리 조절 함수
+            currentAmbience={engine.ambience}
+            setAmbience={engine.setAmbience}
+            onSignOut={async () => {
+              // supabase가 import 되어있다고 가정
+              // await supabase.auth.signOut(); 
+              // window.location.reload();
+              alert("로그아웃 되었습니다.");
+            }}
+            
             setIsMixerMode={engine.setIsMixerMode}
             mixerVolumes={engine.mixerVolumes}
             setMixerVolumes={engine.setMixerVolumes}
@@ -464,18 +618,20 @@ export default function BambooForest() {
             user={user} isPremium={isPremium} signOut={engine.signOut} getUserInitial={getUserInitial} 
         />
 
-        <BottleWriteModal 
-            isOpen={showWriteBottle} onClose={() => setShowWriteBottle(false)} onSend={sendBottle} 
-        />
-        
-        <BottleReadModal 
-            bottle={foundBottle} onClose={() => setFoundBottle(null)} 
-            onLike={likeBottle} onReply={replyToBottle} isPremium={isPremium}
-            onShare={engine.openSoulography}
+        {/* Whisper(Bottle) Modal: 이제 이거 하나면 됩니다! */}
+        <BottleModals 
+            isOpen={engine.isWhisperOpen} 
+            onClose={() => engine.setWhisperOpen(false)}
+            
+            // 👇 핵심: 여기에 함수를 넣어주면 BottleModals가 알아서 WriteModal에 전달합니다.
+            sendBottle={engine.sendBottle} 
         />
 
         <FireRitualModal 
-            isOpen={showFireRitual} onClose={() => setShowFireRitual(false)} onBurn={performFireRitual} 
+            isOpen={engine.showFireRitual} 
+            onClose={() => engine.setShowFireRitual(false)} 
+            //onBurn={engine.performFireRitual}
+            onBurn={engine.performFireRitual} 
         />
         
         <TimeCapsuleModal 
@@ -496,34 +652,6 @@ export default function BambooForest() {
         {/* [New] The Guide */}
         {engine.showGuide && (
                 <ForestGuide onComplete={engine.completeGuide} />
-            )}
-
-        {/* 1. 메뉴 모달 (띄우기 vs 줍기) */}
-        <BottleMenuModal 
-                isOpen={engine.showBottleMenu}
-                onClose={() => engine.setShowBottleMenu(false)}
-                onWrite={() => {
-                    engine.setShowBottleMenu(false);
-                    engine.setShowBottleWrite(true);
-                }}
-                onPickUp={engine.handlePickUp} // 줍기 로직 실행
-            />
-
-            {/* 2. 쓰기 모달 */}
-            <BottleWriteModal
-                isOpen={engine.showBottleWrite}
-                onClose={() => engine.setShowBottleWrite(false)}
-                onSend={engine.castBottle}
-            />
-
-            {/* 3. 읽기 모달 (foundBottle 데이터가 있을 때만 렌더링) */}
-            {engine.foundBottle && (
-                <BottleReadModal
-                    isOpen={true}
-                    bottle={engine.foundBottle}
-                    onClose={() => engine.setFoundBottle(null)} // 닫으면 상태 초기화
-                    onSendWarmth={engine.sendWarmth}
-                />
             )}
 
         {/* [New] Soulography Modal */}
@@ -643,6 +771,7 @@ export default function BambooForest() {
             </motion.div>
           )}
         </AnimatePresence>
+        </motion.div>
     </main>
   );
 }

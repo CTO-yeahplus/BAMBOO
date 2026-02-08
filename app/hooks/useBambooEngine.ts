@@ -6,10 +6,9 @@ import { useHaptic } from './useHaptic';
 import { useSoundEngine } from './useSoundEngine';
 import { useParallax } from './useParallax';
 import { usePushNotification } from './usePushNotification';
-
 import { useSoulData } from './engine/useSoulData';
 import { useSpiritVapi } from './engine/useSpiritVapi';
-import { ARTIFACTS, TIME_THEMES, EMOTION_COLORS, WeatherType, SeasonType,THEMES, ThemeId } from '../types';
+import { ARTIFACTS, TIME_THEMES, EMOTION_COLORS, WeatherType, SeasonType,THEMES, ThemeId, PersonaType } from '../types';
 
 const DAILY_QUOTES = [
   "천천히 가도 괜찮아, 방향만 맞다면.", "비바람이 불어야 뿌리가 단단해지는 법이야.",
@@ -21,12 +20,18 @@ const DAILY_QUOTES = [
 import { ORACLE_DECK } from '../types';
 
 export function useBambooEngine() {
+// -----------------------------------------------------------
+// 1. [Fix] 사운드 믹서 상태 변수 직접 선언 (useSoundEngine 대신 사용)
+// -----------------------------------------------------------
+  const [volume, setVolume] = useState(1);           // 마스터 볼륨 (0~1)
   const { user, isPremium, signInWithGoogle, signOut } = useAuth();
   const { triggerSuccess, triggerMedium, triggerLight, triggerBreathing } = useHaptic();  
   const soul = useSoulData(user, triggerSuccess, isPremium);
   const [showFireRitual, setShowFireRitual] = useState(false);
   const [weather, setWeather] = useState<WeatherType>('clear');
   const [selectedAmbience, setSelectedAmbience] = useState<WeatherType | null>(null);
+  const [isBurning, setIsBurning] = useState(false);
+  const [currentEmotion, setCurrentEmotion] = useState<'neutral' | 'sadness' | 'anger' | 'loneliness' | 'happy'>('neutral');
   const handleEmotionDetected = useCallback((detectedWeather: WeatherType) => {
       setWeather((prev) => {
           if (prev !== detectedWeather) {
@@ -36,24 +41,33 @@ export function useBambooEngine() {
           }
           return prev;
       });
+
+      // [New] 날씨를 감정으로 매핑하여 시각화 상태 업데이트
+      const weatherToEmotion: Record<WeatherType, string> = {
+          'rain': 'sadness',
+          'ember': 'anger',
+          'snow': 'loneliness',
+          'clear': 'happy'
+      };
+      setCurrentEmotion(weatherToEmotion[detectedWeather] as any || 'neutral');
+
   }, [triggerMedium]);
 
   const handleCallEnd = useCallback(() => {
     triggerLight();
     soul.fetchMemories();
   }, [triggerLight, soul]);
-
   // [New] Soulography State
   const [showSoulography, setShowSoulography] = useState(false);
   const [soulographyType, setSoulographyType] = useState<'calendar' | 'letter'>('calendar');
   const [soulographyData, setSoulographyData] = useState<any>(null);
-  const { permission, requestPermission } = usePushNotification();
-
+  const {permission, requestPermission } = usePushNotification();
+  const [isWhisperOpen, setWhisperOpen] = useState(false);
+  
   // [New] Bottle UI States
   const [showBottleMenu, setShowBottleMenu] = useState(false); // 메뉴 (쓰기 vs 줍기)
   const [showBottleWrite, setShowBottleWrite] = useState(false); // 쓰기 모달
   const [foundBottle, setFoundBottle] = useState<any>(null); // 읽기 모달 (데이터 있으면 열림)
-  
   // Helper: 유리병 줍기 액션
   const handlePickUp = async () => {
     const bottle = await soul.pickUpBottle();
@@ -65,9 +79,10 @@ export function useBambooEngine() {
     }
   };
   const openSoulography = (type: 'calendar' | 'letter', data: any) => {
-      setSoulographyType(type);
-      setSoulographyData(data);
-      setShowSoulography(true);
+    console.log("📸 Opening Soulography with:", data);
+    setSoulographyType(type);
+    setSoulographyData(data);
+    setShowSoulography(true);
   };
   // [New] Oracle States
   const [todaysCard, setTodaysCard] = useState<any>(null);
@@ -89,14 +104,15 @@ export function useBambooEngine() {
 
   const voice = useSpiritVapi(user?.id ?? null, handleCallEnd, handleEmotionDetected);
   const [currentTheme, setCurrentTheme] = useState<ThemeId>('bamboo');
-  const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({ clear: null, rain: null, snow: null, ember: null });
+  //const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({ clear: null, rain: null, snow: null, ember: null });
   const fadeIntervals = useRef<{ [key in WeatherType]: NodeJS.Timeout | null }>({ clear: null, rain: null, snow: null, ember: null });
   const [showSpiritCapsules, setShowSpiritCapsules] = useState(false);
 
   const { x: rawX, y: rawY, requestAccess: requestGyro } = useParallax();
   const smoothOptions = { stiffness: 100, damping: 20 };
-  const mouseX = useSpring(rawX, smoothOptions);
+  const mouseX = useSpring(rawX, { stiffness: 100, damping: 20 }); // mouseX 사용
   const mouseY = useSpring(rawY, smoothOptions);
+  
 
   // [New] Change Theme Logic
   const setTheme = (themeId: ThemeId) => {
@@ -152,7 +168,9 @@ export function useBambooEngine() {
   
   const [bgVolume, setBgVolume] = useState(0.5);
   const [voiceVolume, setVoiceVolume] = useState(1.0);
+  const [ambience, setAmbience] = useState('forest');
   const [showGuide, setShowGuide] = useState(false);
+
   // [New] Check First Visit (useEffect)
   useEffect(() => {
     // localStorage에서 확인
@@ -183,28 +201,46 @@ export function useBambooEngine() {
     mixerVolumes, 
     setMixerVolumes, 
     applyPreset,
-    binauralMode, setBinauralMode
-  } = useSoundEngine(selectedAmbience, bgVolume); // <--- [Fix] 여기에 인자를 넣어주세요!
+    binauralMode, setBinauralMode, audioRefs,
+  } = useSoundEngine(selectedAmbience, bgVolume, mouseX, voice.callStatus); 
 
   // [New] Mobile Audio Warm-up
   const startExperience = useCallback(() => {
       setHasStarted(true);
+      // 1. iOS Gyroscope Permission Request (반드시 사용자 터치 직후 호출)
+      // 이 함수는 useParallax에서 가져온 requestAccess입니다.
+      requestGyro();
+      
+      // 1. iOS Gyroscope Permission Request (반드시 사용자 터치 직후 호출)
+      // 이 함수는 useParallax에서 가져온 requestAccess입니다.
+      requestGyro();
+
+      // 2. Audio Elements Warm-up (모바일 브라우저 정책 우회)
+      // 모든 오디오 태그를 0.1초간 재생하고 멈춰서 '재생 권한'을 획득합니다.
       Object.values(audioRefs.current).forEach(audio => {
           if (audio) {
-              audio.muted = true;
+              audio.muted = true; // 사용자에게 들리지 않게 무음 처리
               const playPromise = audio.play();
+              
               if (playPromise !== undefined) {
                   playPromise.then(() => {
-                      audio.pause();
-                      audio.muted = false;
+                      // 재생 성공! 브라우저가 "이 사이트는 오디오 재생 가능"으로 인식함.
+                      // 아주 짧은 시간 후에 멈추고 음소거 해제
+                      setTimeout(() => {
+                        audio.pause();
+                        audio.currentTime = 0; // 위치 초기화
+                        audio.muted = false;   // 나중에 실제 재생할 때를 위해 음소거 해제
+                      }, 50); // 50ms면 충분합니다.
                   }).catch(error => {
-                      console.log("Audio warm-up blocked:", error);
+                      console.warn("Audio warm-up blocked (Auto-play policy):", error);
                   });
+                }
               }
-          }
-      });
+        });
+      
+      // 3. Web Audio API Context Resume
       initAudio(); 
-  }, [initAudio]);
+      }, [initAudio, requestGyro]);
 
   const [hasStarted, setHasStarted] = useState(false);
 
@@ -223,11 +259,12 @@ export function useBambooEngine() {
       triggerSuccess();
       playMagicDust();
       playWindChime();
-      voice.requestGyroAccess(); 
       requestGyro(); 
       setHasWoken(true);
       setShowTutorial(true);
-      voice.setSpiritMessage("...오랫동안 너를 기다렸어.");
+      // 👇 [수정] 유저 이름 + 환영 인사
+      const name = user?.email?.split('@')[0] || 'Traveler';
+      voice.setSpiritMessage(`어서와, 기다리고 있었어, ${name}.`);
       setTimeout(() => setShowTutorial(false), 8000);
   };
 
@@ -274,6 +311,7 @@ export function useBambooEngine() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
+  
 
   // 캘린더 열릴 때 데이터 로드
   useEffect(() => {
@@ -416,112 +454,231 @@ export function useBambooEngine() {
 
   // [New] Burn Logic
   const performFireRitual = useCallback(() => {
+    // 0. [시각 효과 시작]
+    setIsBurning(true);
+
     // 1. 강한 햅틱
     triggerSuccess(); 
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
-         navigator.vibrate([100, 50, 200, 50, 500]); // 웅~ 웅~ 콰광
+         navigator.vibrate([100, 50, 200, 50, 500]); 
     }
 
-    // 2. 불 소리 재생 (Audio Refs 사용)
+    // 2. 불 소리 재생
     const fireAudio = audioRefs.current['ember'];
     if (fireAudio) {
         fireAudio.volume = 1.0;
         fireAudio.currentTime = 0;
         fireAudio.play();
-        // 4초 뒤 페이드 아웃
         setTimeout(() => {
            fadeToVolume('ember', selectedAmbience === 'ember' ? bgVolume : 0, 2000);
         }, 4000);
     }
 
-    // 3. 보상 (정화의 의미로 공명도 소폭 상승)
+    // 3. 보상
     soul.addResonance(20);
     
-    }, [triggerSuccess, audioRefs, fadeToVolume, selectedAmbience, bgVolume, soul]);
+    // 4. [시각 효과 종료] 4초 뒤에 상태 끄기
+    setTimeout(() => {
+        setIsBurning(false);
+    }, 4000);
 
-    const [showOnboarding, setShowOnboarding] = useState(false);
+  }, [triggerSuccess, audioRefs, fadeToVolume, selectedAmbience, bgVolume, soul]);
 
-    // [Check] 최초 방문 여부 확인
-    useEffect(() => {
-        const hasVisited = localStorage.getItem('has_visited_forest');
-        if (!hasVisited) {
-            setShowOnboarding(true);
-        }
-    }, []);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
-    // [New] 온보딩 완료 핸들러
-    const handleOnboardingComplete = (weatherId: string, personaId: string) => {
-        // 1. 날씨(배경음) 설정
-        changeAmbience(weatherId as any);
-        
-        // 2. 정령 페르소나 설정
-        voice.setCurrentPersona(personaId);
+  // [Check] 최초 방문 여부 확인
+  useEffect(() => {
+    const hasVisited = localStorage.getItem('has_visited_forest');
+    if (!hasVisited) {
+        setShowOnboarding(true);
+    }
+  }, []);
 
-        // 3. 완료 처리
-        localStorage.setItem('has_visited_forest', 'true');
-        setShowOnboarding(false);
-        
-        // 4. 환영 효과
-        triggerSuccess();
-        setTimeout(() => wakeSpirit(), 1000); // 1초 뒤 정령 깨우기
-    };
+  // [New] 온보딩 완료 핸들러
+  const handleOnboardingComplete = (weatherId: string, personaId: string) => {
+    // 1. 날씨(배경음) 설정
+    changeAmbience(weatherId as any);
+    
+    // 2. 정령 페르소나 설정
+    voice.setCurrentPersona(personaId as PersonaType);
+
+    // 3. 완료 처리
+    localStorage.setItem('has_visited_forest', 'true');
+    setShowOnboarding(false);
+    
+    // 4. 환영 효과
+    triggerSuccess();
+    setTimeout(() => wakeSpirit(), 1000); // 1초 뒤 정령 깨우기
+  };
 
   return {
-      user, isPremium, signInWithGoogle, signOut, isMounted: true, 
-      hasStarted, startExperience,
-      callStatus: voice.callStatus, toggleCall: voice.toggleCall, spiritMessage: voice.spiritMessage,
-      isSilentMode: voice.isSilentMode, toggleSilentMode, sendTextMessage: voice.sendTextMessage, getStatusText,
-      resonance: soul.resonance, soulLevel: soul.soulLevel, memories: soul.memories,
-      ownedItems: soul.ownedItems, equippedItems: soul.equippedItems, unlockArtifact: soul.unlockArtifact, equipArtifact: soul.equipArtifact, ARTIFACTS: soul.ARTIFACTS,
-      hasWoken, wakeSpirit, showTutorial, dailyQuote, hasCollectedDew, collectDew,
-      isBreathing, toggleBreathing, 
-      showJournal, setShowJournal, showAltar, setShowAltar, showSettings, setShowSettings, showMemoryRitual, setShowMemoryRitual, pendingSummary, setPendingSummary,
-      backgroundGradient, weather, isDaytime, showEasterEgg, bgVolume, setBgVolume, voiceVolume, setVoiceVolume, selectedAmbience, changeAmbience, season,
-      playPaperRustle, playMagicDust, initAudio, triggerLight, motionValues, audioRefs, finalizeMemory, deleteMemory, shareMemory, capturingId: null, isDeleting: null,
-      isHolding, setIsHolding, handlePet,
-      letters: soul.letters, generateMonthlyLetter: soul.generateMonthlyLetter, saveVoiceCapsule: soul.saveVoiceCapsule, generateWeeklyReport: soul.generateWeeklyReport,
-      sleepTimer, startSleepTimer, stopSleepTimer, playIntroBoom,
-      showOracleModal: soul.showOracleModal, confirmOracle: soul.confirmOracle,
-      fireflies, broadcastTouch,
-      // [Fix] Export Bottle Functions
-      sendBottle: soul.sendBottle, 
-      findRandomBottle: soul.findRandomBottle, 
-      likeBottle: soul.likeBottle, 
-      foundBottle: soul.foundBottle, 
-      setFoundBottle: soul.setFoundBottle,
-      showFireRitual, setShowFireRitual, performFireRitual,
-      spiritForm: soul.spiritForm,
-      changeSpiritForm: soul.changeSpiritForm,
-      SPIRIT_FORMS: soul.SPIRIT_FORMS,
-      showGalleryModal: soul.showGalleryModal,
-      setShowGalleryModal: soul.setShowGalleryModal,
-      isMixerMode, setIsMixerMode,
-      mixerVolumes, setMixerVolumes,
-      applyPreset, currentTheme, setTheme,
-      replyToBottle: soul.replyToBottle,
-      monthlyMoods: soul.monthlyMoods,
-      showCalendar, setShowCalendar,
-      calYear, setCalYear,
-      calMonth, setCalMonth, binauralMode, setBinauralMode,
-      showSoulography, setShowSoulography, soulographyType, soulographyData, openSoulography,
-      pushPermission: permission, requestPushPermission: requestPermission,
-      showOnboarding, handleOnboardingComplete,
-      // 정령 보관함 (신규)
-      spiritCapsules: soul.spiritCapsules,
-      keepSpiritVoice: soul.keepSpiritVoice,
-      forgetSpiritVoice: soul.forgetSpiritVoice,
-      showSpiritCapsules, setShowSpiritCapsules,
+    // 1. User & Auth
+    user, 
+    isPremium, 
+    signInWithGoogle, 
+    signOut, 
+    isMounted: true, 
+    
+    // 2. Mobile Experience
+    hasStarted, 
+    startExperience,
 
-      // Bottle UI States & Handlers
-      showBottleMenu, setShowBottleMenu,
-      showBottleWrite, setShowBottleWrite,
-      handlePickUp,
-      pickUpBottle: soul.pickUpBottle,
-      sendWarmth: soul.sendWarmth,
-      castBottle: soul.castBottle,
-      showGuide, completeGuide,
-      todaysCard,
-      isOracleLoading,
-      drawOracleCard,
-  };
+    // 3. Vapi (Voice)
+    callStatus: voice.callStatus, 
+    toggleCall: voice.toggleCall, 
+    spiritMessage: voice.spiritMessage,
+    setSpiritMessage: voice.setSpiritMessage,
+    isSilentMode: voice.isSilentMode, 
+    toggleSilentMode, 
+    sendTextMessage: voice.sendTextMessage, 
+    getStatusText,
+
+    // 4. Soul Data (Profile & Items)
+    resonance: soul.resonance, 
+    soulLevel: soul.soulLevel, 
+    memories: soul.memories,
+    ownedItems: soul.ownedItems, 
+    equippedItems: soul.equippedItems, 
+    unlockArtifact: soul.unlockArtifact, 
+    equipArtifact: soul.equipArtifact, 
+    ARTIFACTS: soul.ARTIFACTS,
+    isWhisperOpen,
+    setWhisperOpen,
+
+    // 5. Interaction States
+    hasWoken, 
+    wakeSpirit, 
+    showTutorial, 
+    dailyQuote, 
+    hasCollectedDew, 
+    collectDew,
+    isBreathing, 
+    toggleBreathing, 
+    isHolding, 
+    setIsHolding, 
+    handlePet,
+
+    // 6. UI Visibility States
+    showJournal, setShowJournal, 
+    showAltar, setShowAltar, 
+    showSettings, setShowSettings, 
+    showMemoryRitual, setShowMemoryRitual, 
+    pendingSummary, setPendingSummary,
+    
+    // 7. Environment (Weather & Time)
+    backgroundGradient, 
+    weather, 
+    isDaytime, 
+    showEasterEgg, 
+    bgVolume, setBgVolume, 
+    voiceVolume, setVoiceVolume, 
+    selectedAmbience, changeAmbience, 
+    season,
+    soul, ambience, setAmbience, volume, setVolume,
+
+    // 8. Audio & Effects
+    playPaperRustle, 
+    playMagicDust, 
+    initAudio, 
+    triggerLight, 
+    motionValues, 
+    audioRefs, // [Critical] 이게 없어서 에러가 났을 확률이 높음
+    playIntroBoom,
+
+    // 9. Memory Actions
+    finalizeMemory, 
+    deleteMemory, 
+    shareMemory, 
+    capturingId: null, 
+    isDeleting: null,
+
+    // 10. Letter & Reports
+    letters: soul.letters, 
+    generateMonthlyLetter: soul.generateMonthlyLetter, 
+    generateWeeklyReport: soul.generateWeeklyReport,
+
+    // 11. Time Capsule
+    saveVoiceCapsule: soul.saveVoiceCapsule, 
+    sleepTimer, startSleepTimer, stopSleepTimer, 
+
+    // 12. Oracle
+    showOracleModal: soul.showOracleModal, 
+    confirmOracle: soul.confirmOracle,
+    todaysCard,
+    isOracleLoading,
+    drawOracleCard,
+
+    // 13. Presence (Fireflies)
+    fireflies, 
+    broadcastTouch,
+
+    // 14. Bottle (Social)
+    sendBottle: soul.sendBottle, 
+    findRandomBottle: soul.findRandomBottle, 
+    likeBottle: soul.likeBottle, 
+    foundBottle: soul.foundBottle, 
+    setFoundBottle: soul.setFoundBottle, 
+    replyToBottle: soul.replyToBottle, 
+    showBottleMenu, setShowBottleMenu,
+    showBottleWrite, setShowBottleWrite,
+    handlePickUp,
+    pickUpBottle: soul.pickUpBottle,
+    sendWarmth: soul.sendWarmth,
+    castBottle: soul.castBottle,
+
+    // 15. Fire Ritual
+    showFireRitual, setShowFireRitual, performFireRitual,
+    isBurning, setIsBurning,
+
+    // 16. Spirit Form & Evolution
+    spiritForm: soul.spiritForm,
+    changeSpiritForm: soul.changeSpiritForm,
+    SPIRIT_FORMS: soul.SPIRIT_FORMS,
+    currentEmotion,
+
+    // 17. Gallery
+    showGalleryModal: soul.showGalleryModal,
+    setShowGalleryModal: soul.setShowGalleryModal,
+
+    // 18. Sound Mixer
+    isMixerMode, setIsMixerMode,
+    mixerVolumes, setMixerVolumes,
+    applyPreset, 
+    
+    // 19. Theme
+    currentTheme, setTheme,
+
+    // 20. Calendar
+    monthlyMoods: soul.monthlyMoods,
+    fetchMonthlyMoods: soul.fetchMonthlyMoods, // 👈 이 줄을 추가하세요!
+    showCalendar, setShowCalendar,
+    calYear, setCalYear,
+    calMonth, setCalMonth, 
+
+    // 21. Binaural
+    binauralMode, setBinauralMode,
+
+    // 22. Soulography (Share)
+    showSoulography, setShowSoulography, 
+    soulographyType, soulographyData, 
+    openSoulography,
+
+    // 23. Push Notification
+    pushPermission: permission, 
+    requestPushPermission: requestPermission,
+
+    // 24. Onboarding
+    showOnboarding, handleOnboardingComplete,
+    
+    // 25. Spirit Capsules (Voice Storage)
+    spiritCapsules: soul.spiritCapsules,
+    keepSpiritVoice: soul.keepSpiritVoice,
+    forgetSpiritVoice: soul.forgetSpiritVoice,
+    showSpiritCapsules, setShowSpiritCapsules,
+
+    // 26. Guide
+    showGuide, completeGuide,
+    oracleHistory: soul.oracleHistory,
+    
+};
 }

@@ -4,7 +4,9 @@ export type WeatherType = 'clear' | 'rain' | 'snow' | 'ember';
 export type CallStatus = 'idle' | 'connecting' | 'active' | 'speaking' | 'listening' | 'processing';
 export type SeasonType = 'spring' | 'summer' | 'autumn' | 'winter';
 export type ThemeId = 'bamboo' | 'aurora' | 'sakura' | 'cyberpunk';
-export type ArtifactType = 'aura' | 'head';
+export type PersonaType = 'spirit' | 'shadow' | 'light';
+export type ItemType = 'atmosphere' | 'artifact' | 'spirit_form' | 'aura' | 'head';
+
 
 export interface ThemeConfig {
   id: ThemeId;
@@ -73,11 +75,11 @@ export interface Memory {
 
 // 👇 [New] OracleCard 인터페이스 추가
 export interface OracleCard {
+  id: string;
   name: string;
-  image_url: string;
-  keywords: string;
-  interpretation: string;
-  lucky_advice: string;
+  message: string;
+  advice: string;
+  theme: string;
 }
 
 // [New] Whisper Bottle Definition
@@ -93,62 +95,49 @@ export interface WhisperBottle {
   reply_author_id?: string;     // 답장한 수호자의 ID (공명도 보상용)
 }
 
+// 2. [Fix] ORACLE_DECK 데이터에 'id' 값 채워넣기
 export const ORACLE_DECK: OracleCard[] = [
   { 
-      name: '쉼 (Rest)', 
-      image_url: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?q=80&w=1000&auto=format&fit=crop', // 고요한 숲/자연
-      keywords: '휴식, 재충전, 내면의 평화',
-      interpretation: "지금은 잠시 멈추어 숨을 고를 때입니다. 쉼은 시간 낭비가 아니라, 더 멀리 나아가기 위한 도약의 준비입니다. 소란스러운 세상의 소리를 끄고, 당신 내면의 고요한 목소리에 귀를 기울이세요.",
-      lucky_advice: "따뜻한 차 한 잔을 마시며 5분간 멍하니 창밖을 바라보세요."
+      id: 'card_moon', // 👈 ID 추가
+      name: "The Moon (달)", 
+      theme: "Reflection", 
+      message: "보이지 않는 것을 두려워하지 마세요. 어둠은 휴식을 위한 시간입니다.", 
+      advice: "지금은 행동할 때가 아니라, 내면을 들여다볼 때입니다." 
   },
   { 
-      name: '용기 (Courage)', 
-      image_url: 'https://images.unsplash.com/photo-1528164344705-4754268798dd?q=80&w=1000&auto=format&fit=crop', // 여명/일출
-      keywords: '도전, 자신감, 첫걸음',
-      interpretation: "두려움은 당신이 성장하고 있다는 증거입니다. 거창한 계획보다 중요한 것은 지금 당장의 작은 실천입니다. 당신이 내딛는 그 작은 한 걸음이 곧 길이 될 것입니다. 스스로를 믿고 나아가세요.",
-      lucky_advice: "오늘 망설였던 일 중 가장 작은 것 하나를 지금 바로 저질러보세요."
+      id: 'card_sun', 
+      name: "The Sun (태양)", 
+      theme: "Clarity", 
+      message: "구름 뒤에는 항상 빛이 있습니다. 당신의 진심은 결국 빛날 것입니다.", 
+      advice: "자신감을 가지고 당신의 온기를 세상에 나누세요." 
   },
   { 
-      name: '위로 (Comfort)', 
-      image_url: 'https://images.unsplash.com/photo-1504194569480-165eb3d1dc3f?q=80&w=1000&auto=format&fit=crop', // 따뜻한 햇살
-      keywords: '치유, 희망, 따스함',
-      interpretation: "괜찮습니다. 그림자가 있다는 건 근처에 빛이 있다는 증거니까요. 당신의 슬픔은 곧 아물 것이며, 그 상처 자리에는 더 단단하고 아름다운 새살이 돋아날 것입니다. 오늘은 당신 자신에게 조금 더 관대해지세요.",
-      lucky_advice: "좋아하는 음악을 들으며 스스로를 꼭 안아주세요."
+      id: 'card_forest', 
+      name: "The Forest (숲)", 
+      theme: "Growth", 
+      message: "나무는 하루아침에 자라지 않습니다. 당신의 속도는 틀리지 않았습니다.", 
+      advice: "조급함을 버리고, 지금 딛고 있는 땅의 단단함을 느끼세요." 
   },
   { 
-      name: '기억 (Memory)', 
-      image_url: 'https://images.unsplash.com/photo-1501619583091-c27c699042b0?q=80&w=1000&auto=format&fit=crop', // 반짝이는 빛/추억
-      keywords: '회상, 소중함, 그리움',
-      interpretation: "과거의 행복했던 기억은 당신을 지키는 든든한 방패입니다. 힘들고 지칠 때 꺼내 볼 수 있는 보석 같은 순간들을 소중히 간직하세요. 그 기억들이 오늘의 당신을 지탱하는 힘이 되어줄 것입니다.",
-      lucky_advice: "사진첩을 열어 가장 행복하게 웃고 있는 당신의 사진을 찾아보세요."
+      id: 'card_river', 
+      name: "The River (강)", 
+      theme: "Flow", 
+      message: "흐르는 물은 바위를 뚫지 않고 돌아갑니다. 유연함이 가장 큰 힘입니다.", 
+      advice: "저항하지 말고 상황의 흐름에 몸을 맡겨보세요." 
   },
   { 
-      name: '놓아줌 (Release)', 
-      image_url: '/images/oracle/card-rest.png',
-      keywords: '해방, 비움, 자유',
-      interpretation: "꽉 쥔 손을 펴야 새로운 것을 잡을 수 있습니다. 집착하고 있는 고민이나 관계가 있다면 바람에 실어 보내세요. 빈 손이 되어야 비로소 더 값지고 새로운 기회가 찾아옵니다. 흐르는 물처럼 유연해지세요.",
-      lucky_advice: "책상 위나 가방 속의 불필요한 물건을 하나 정리하여 버리세요."
+      id: 'card_wind', 
+      name: "The Wind (바람)", 
+      theme: "Change", 
+      message: "변화는 예고 없이 찾아오지만, 새로운 씨앗을 데려옵니다.", 
+      advice: "떠나보내야 할 것이 있다면 가볍게 놓아주세요." 
   },
   { 
-      name: '시작 (Beginnings)', 
-      image_url: 'https://images.unsplash.com/photo-1496661415325-ef852f9e8e7c?q=80&w=1000&auto=format&fit=crop', // 새싹/초록
-      keywords: '기회, 가능성, 새출발',
-      interpretation: "늦지 않았습니다. 당신의 이야기는 매일 아침 새롭게 쓰입니다. 과거에 얽매이지 마세요. 바로 지금 이 순간이 당신의 남은 인생에서 가장 젊고, 가능성으로 가득 찬 때입니다.",
-      lucky_advice: "평소와 다른 길로 산책하거나, 새로운 메뉴를 주문해보세요."
-  },
-  { 
-      name: '자존감 (Self-Love)', 
-      image_url: 'https://images.unsplash.com/photo-1516575150278-77136aed6920?q=80&w=1000&auto=format&fit=crop', // 하트/거울/자신
-      keywords: '사랑, 가치, 존중',
-      interpretation: "타인의 시선으로 당신을 정의하지 마세요. 당신은 우주에서 유일무이한 존재입니다. 당신은 어떤 성과를 내서가 아니라, 존재하는 그 자체만으로도 충분히 사랑받고 존중받을 가치가 있습니다.",
-      lucky_advice: "거울을 보고 눈을 맞추며 '나는 꽤 괜찮은 사람이야'라고 말해주세요."
-  },
-  {
-      name: '직관 (Intuition)',
-      image_url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1000&auto=format&fit=crop', // 밤하늘/달/신비
-      keywords: '지혜, 통찰, 내면의 눈',
-      interpretation: "논리적인 생각보다 당신의 직감을 믿으세요. 마음속 깊은 곳에서 울리는 작은 목소리가 정답을 알고 있습니다. 안개가 걷히고 곧 명확한 길이 보일 것입니다.",
-      lucky_advice: "오늘 하루는 고민하지 말고, 처음에 든 생각대로 행동해보세요."
+      id: 'card_star', 
+      name: "The Star (별)", 
+      theme: "Hope", 
+      message: "가장 어두운 밤에 별은 가장 밝게 빛납니다. 당신은 길을 잃지 않았습니다.", 
+      advice: "멀리 있는 목표보다는, 당장 눈앞의 작은 불빛을 따라가세요." 
   }
 ];
 
@@ -168,15 +157,6 @@ export const EMOTION_COLORS = {
   work: ['from-zinc-950', 'via-slate-950', 'to-black'],
 };
 
-export interface Artifact {
-    id: string;
-    type: ArtifactType;
-    name: string;
-    description: string;
-    cost: number;
-    icon: string;
-}
-
 export interface DailyMood {
   date: string;       // "2023-10-27" 형태
   dominantEmotion: 'sadness' | 'anger' | 'loneliness' | 'happy' | 'neutral';
@@ -193,15 +173,6 @@ export interface FireflyUser {
   color: string; // Hex color
   last_active: number; // Timestamp
 }
-
-export const ARTIFACTS: Artifact[] = [
-    { id: 'aura_firefly', type: 'aura', name: "Forest Whispers", description: "작은 숲의 정령들이 주위를 맴돕니다.", cost: 0, icon: "✨" }, 
-    { id: 'aura_moonlight', type: 'aura', name: "Lunar Veil", description: "달빛의 가호가 깃듭니다.", cost: 150, icon: "🌙" },
-    { id: 'aura_ember', type: 'aura', name: "Warmth of Hearth", description: "따뜻한 온기가 감돕니다.", cost: 300, icon: "🔥" },
-    { id: 'head_flower', type: 'head', name: "Bloom Crown", description: "봄에 핀 첫 꽃으로 만든 화관.", cost: 100, icon: "🌸" },
-    { id: 'head_fox', type: 'head', name: "Mystic Mask", description: "오래된 여우 가면.", cost: 500, icon: "🦊" },
-];
-
 // [New] Spirit Form Type
 export type SpiritFormType = 'wisp' | 'fox' | 'guardian';
 
@@ -226,3 +197,125 @@ export const MEMORY_GALLERY: MemoryIllustration[] = [
   { id: 'mem_2', title: '비 개인 오후', description: '나뭇잎 사이로 햇살이 비추던 날.', imageUrl: '/images/memories/rain.png', thumbnailUrl: '/images/memories/rain_thumb.png', unlockResonance: 150 },
   { id: 'mem_3', title: '함께 본 별', description: '밤하늘을 수놓은 별들을 바라보며.', imageUrl: '/images/memories/stars.png', thumbnailUrl: '/images/memories/stars_thumb.png', unlockResonance: 300 },
 ];
+
+
+export const SOUL_MASKS = [
+  {
+    id: 'spirit',
+    name: 'The Spirit (정령)',
+    desc: "무판단, 경청, 고요한 위로.\n당신의 이야기를 있는 그대로 비추는 거울입니다.",
+    // 👇 환경변수에서 로드 (없으면 빈 문자열이나 에러 방지용 값)
+    assistantId: process.env.NEXT_PUBLIC_VAPI_ID_SPIRIT || "", 
+    baseColor: "#fbbf24",
+    visualStyle: "ethereal",
+    icon: "✨"
+  },
+  {
+      id: 'shadow',
+      name: 'The Shadow (그림자)',
+      desc: "단단한 바위, 묵묵한 수용.\n당신의 분노와 고통을 바위처럼 받아냅니다.",
+      // 👇 환경변수에서 로드
+      assistantId: process.env.NEXT_PUBLIC_VAPI_ID_SHADOW || "", 
+      baseColor: "#ef4444",
+      visualStyle: "magma",
+      icon: "🌑"
+  },
+  {
+      id: 'light',
+      name: 'The Light (빛)',
+      desc: "따뜻한 햇살, 무조건적인 애정.\n언제나 당신 편이 되어주는 다정한 존재입니다.",
+      // 👇 환경변수에서 로드
+      assistantId: process.env.NEXT_PUBLIC_VAPI_ID_LIGHT || "", 
+      baseColor: "#f472b6",
+      visualStyle: "cloud",
+      icon: "💖"
+  }
+];
+
+
+// 2. [Fix] Artifact 인터페이스 통합: description으로 통일
+export interface Artifact {
+    id: string;
+    type: ItemType;
+    name: string;
+    description: string; // desc -> description으로 변경 (기존 코드와 호환)
+    cost: number;
+    icon: string;
+    effect?: string;        // (New) 효과 식별자
+    requiredLevel?: number; // (New) 해금 레벨
+}
+
+// 3. 기존 ARTIFACTS (그대로 유지)
+export const ARTIFACTS: Artifact[] = [
+    { id: 'aura_firefly', type: 'aura', name: "Forest Whispers", description: "작은 숲의 정령들이 주위를 맴돕니다.", cost: 0, icon: "✨" }, 
+    { id: 'aura_moonlight', type: 'aura', name: "Lunar Veil", description: "달빛의 가호가 깃듭니다.", cost: 150, icon: "🌙" },
+    { id: 'aura_ember', type: 'aura', name: "Warmth of Hearth", description: "따뜻한 온기가 감돕니다.", cost: 300, icon: "🔥" },
+    { id: 'head_flower', type: 'head', name: "Bloom Crown", description: "봄에 핀 첫 꽃으로 만든 화관.", cost: 100, icon: "🌸" },
+    { id: 'head_fox', type: 'head', name: "Mystic Mask", description: "오래된 여우 가면.", cost: 500, icon: "🦊" },
+];
+
+// 4. [New] 상점 전용 아이템 (SANCTUARY_ITEMS)
+// 기존 ARTIFACTS와 합쳐서 보여줘도 되고, 별도로 관리해도 됩니다.
+export const SANCTUARY_ITEMS: Artifact[] = [
+    // 1. Atmosphere (환경 변화)
+    {
+        id: 'theme_dawn',
+        type: 'atmosphere',
+        name: 'Eternal Dawn',
+        description: "숲의 시간을 희망찬 새벽으로 고정합니다.",
+        cost: 300,
+        icon: "🌅",
+        effect: "theme_dawn"
+    },
+    {
+        id: 'theme_purple_rain',
+        type: 'atmosphere',
+        name: 'Mystic Rain',
+        description: "신비로운 치유의 비가 내리는 날씨를 부릅니다.",
+        cost: 500,
+        icon: "☔",
+        effect: "theme_rain_purple"
+    },
+    
+    // 2. Artifacts (오브제)
+    {
+        id: 'artifact_lantern',
+        type: 'artifact',
+        name: 'Memory Lantern',
+        description: "과거의 소중한 대화를 담아 숲에 띄웁니다.",
+        cost: 150,
+        icon: "🏮",
+        effect: "spawn_lantern"
+    },
+    
+    // 3. Spirit Evolution (정령 진화)
+    {
+        id: 'form_fox',
+        type: 'spirit_form',
+        name: 'Spirit Fox',
+        description: "정령이 지혜로운 여우의 형상을 취합니다.",
+        cost: 0, 
+        requiredLevel: 5,
+        icon: "🦊",
+        effect: "form_fox"
+    },
+    {
+        id: 'form_guardian',
+        type: 'spirit_form',
+        name: 'The Guardian',
+        description: "완전한 공명에 도달한 정령의 진정한 모습입니다.",
+        cost: 0,
+        requiredLevel: 10,
+        icon: "🦌",
+        effect: "form_guardian"
+    }
+];
+
+export interface Soul {
+  id: string;
+  soulResonance: number;      // 현재 공명도 (재화)
+  unlockedItems: string[];    // 해금된 아이템 ID 목록
+  level: number;
+  exp: number;
+  // 필요한 경우 추가 필드
+}

@@ -109,6 +109,134 @@ export const ThemeParticles = ({ type }: { type: string }) => {
     return null;
 };
 
+// [New] 감정별 색상 팔레트 (빛의 색상)
+const SPIRIT_COLORS = {
+    neutral: { core: '#fbbf24', glow: '#d97706', aura: 'rgba(251, 191, 36, 0.2)' }, // Amber (따뜻함)
+    sadness: { core: '#60a5fa', glow: '#2563eb', aura: 'rgba(96, 165, 250, 0.2)' }, // Blue (우울 -> 차분함)
+    anger: { core: '#f87171', glow: '#dc2626', aura: 'rgba(248, 113, 113, 0.2)' }, // Red (화 -> 에너지)
+    loneliness: { core: '#e879f9', glow: '#c026d3', aura: 'rgba(232, 121, 249, 0.2)' }, // Purple (신비로움)
+    happy: { core: '#facc15', glow: '#ca8a04', aura: 'rgba(250, 204, 21, 0.3)' }, // Yellow (기쁨)
+};
+
+// [Core] 숨 쉬는 빛 (The Visualizer)
+export const LivingSpirit = ({ 
+    emotion = 'neutral', 
+    volume, // MotionValue (0~1)
+    isTalking,
+    form // 'wisp' | 'fox' | 'guardian' (형태 변화)
+}: { 
+    emotion?: keyof typeof SPIRIT_COLORS, 
+    volume: MotionValue,
+    isTalking: boolean,
+    form: SpiritFormType
+}) => {
+    // 1. 현재 감정의 색상 가져오기
+    const colors = SPIRIT_COLORS[emotion] || SPIRIT_COLORS['neutral'];
+
+    // 2. 음성 반응성 (Volume에 따른 크기/투명도 변화)
+    const scale = useTransform(volume, [0, 1], [1, 1.5]); // 말할 때 커짐
+    const glowOpacity = useTransform(volume, [0, 1], [0.5, 1]); // 말할 때 더 밝아짐
+    const turbulence = useTransform(volume, [0, 1], [10, 2]); // 말할 때 회전이 빨라짐 (duration 감소)
+
+    return (
+        <motion.div 
+            className="relative flex items-center justify-center pointer-events-none"
+            style={{ width: 400, height: 400 }}
+        >
+            {/* A. Aura Field (가장 바깥쪽의 은은한 오라) */}
+            <motion.div 
+                className="absolute inset-0 rounded-full blur-[60px] mix-blend-screen"
+                style={{ backgroundColor: colors.aura }}
+                animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.3, 0.5, 0.3] }}
+                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+            />
+
+            {/* B. Liquid Plasma Layers (유기적으로 움직이는 빛 덩어리들) */}
+            <motion.div style={{ scale }} className="relative w-64 h-64">
+                {/* Layer 1: Base Blob */}
+                <motion.div 
+                    className="absolute inset-0 rounded-full blur-[20px] mix-blend-screen opacity-80"
+                    style={{ background: `conic-gradient(from 0deg, ${colors.glow}, transparent, ${colors.core}, transparent, ${colors.glow})` }}
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                />
+                
+                {/* Layer 2: Counter-Rotating Blob (불규칙성 추가) */}
+                <motion.div 
+                    className="absolute inset-4 rounded-full blur-[25px] mix-blend-screen opacity-60"
+                    style={{ background: `radial-gradient(circle at 30% 30%, ${colors.core}, transparent)` }}
+                    animate={{ rotate: -360, scale: [0.9, 1.1, 0.9] }}
+                    transition={{ rotate: { duration: 15, repeat: Infinity, ease: "linear" }, scale: { duration: 5, repeat: Infinity } }}
+                />
+
+                {/* Layer 3: Reactive Core (목소리에 반응하는 중심) */}
+                <motion.div 
+                    className="absolute inset-8 rounded-full blur-[15px] mix-blend-overlay"
+                    style={{ backgroundColor: colors.core, opacity: glowOpacity }}
+                />
+            </motion.div>
+
+            {/* C. Form Projection (형태 투영) */}
+            {/* 빛 속에 은유적으로 형태를 드러냅니다. 너무 구체적이지 않게 실루엣만 표현합니다. */}
+            <div className="absolute inset-0 flex items-center justify-center opacity-40 mix-blend-soft-light">
+                {form === 'fox' && <SpiritFoxSilhouette color={colors.core} />}
+                {form === 'guardian' && <SpiritGuardianSilhouette color={colors.core} />}
+            </div>
+
+            {/* D. Particles (주변을 맴도는 작은 빛 입자들) */}
+            <SpiritParticles color={colors.core} volume={volume} />
+            
+        </motion.div>
+    );
+};
+
+// [Helper] Particles System
+const SpiritParticles = ({ color, volume }: { color: string, volume: MotionValue }) => {
+    // 궤도 회전 속도를 볼륨에 따라 조절하려면 복잡하므로, 여기서는 시각적 장식으로만 둠
+    return (
+        <div className="absolute inset-0 animate-[spin_20s_linear_infinite]">
+            {[...Array(6)].map((_, i) => (
+                <motion.div
+                    key={i}
+                    className="absolute top-1/2 left-1/2 w-1 h-1 rounded-full blur-[1px]"
+                    style={{ 
+                        backgroundColor: color,
+                        boxShadow: `0 0 10px ${color}`,
+                        marginLeft: Math.cos(i) * 100, // 궤도 반경
+                        marginTop: Math.sin(i) * 100,
+                    }}
+                    animate={{ 
+                        scale: [0.5, 1.5, 0.5], 
+                        opacity: [0.2, 0.8, 0.2] 
+                    }}
+                    transition={{ 
+                        duration: 3 + Math.random(), 
+                        repeat: Infinity, 
+                        delay: i * 0.5 
+                    }}
+                />
+            ))}
+        </div>
+    );
+};
+
+// [Helper] Silhouettes (추상적인 형태)
+const SpiritFoxSilhouette = ({ color }: { color: string }) => (
+    <svg viewBox="0 0 100 100" className="w-48 h-48 blur-sm">
+        <path d="M30 60 Q50 85 70 60 L65 85 Q50 95 35 85 Z" fill={color} />
+        <path d="M30 60 Q20 40 35 25 Q45 15 50 30 Q55 15 65 25 Q80 40 70 60" fill="none" stroke={color} strokeWidth="2" />
+    </svg>
+);
+
+const SpiritGuardianSilhouette = ({ color }: { color: string }) => (
+    <svg viewBox="0 0 100 100" className="w-64 h-64 blur-md opacity-60">
+        <circle cx="50" cy="40" r="15" fill={color} />
+        <path d="M20 100 Q50 40 80 100" fill={color} />
+    </svg>
+);
+
+// ... (기존 ThemeParticles, ForestBackground 등 나머지 컴포넌트는 유지)
+
 // [Modified] Background Wrapper
 export const ForestBackground = ({ themeId, themeConfig, children }: { themeId: ThemeId, themeConfig: any, children: React.ReactNode }) => {
     return (
@@ -601,4 +729,18 @@ export const SpiritRenderer = ({ form, hasWoken, isBreathing }: { form: SpiritFo
             // 여기서는 자리만 잡아주고 실제 렌더링은 page.tsx의 로직을 따름
             return null; 
     }
+};
+
+// [Fix] 타입 명시 및 속성 완벽 정의
+type PersonaStyle = {
+    core: string;
+    glow: string;
+    aura: string;
+    blend: string;
+};
+
+const PERSONA_STYLES: Record<string, PersonaStyle> = {
+    spirit: { core: '#fbbf24', glow: '#f59e0b', aura: 'rgba(251, 191, 36, 0.2)', blend: 'mix-blend-screen' },
+    shadow: { core: '#7f1d1d', glow: '#ef4444', aura: 'rgba(0,0,0,0.8)', blend: 'mix-blend-hard-light' }, 
+    light: { core: '#fbcfe8', glow: '#f472b6', aura: 'rgba(244, 114, 182, 0.3)', blend: 'mix-blend-screen' } 
 };

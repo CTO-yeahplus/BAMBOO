@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.93.3",
     "@vapi-ai/web": "^2.5.2",
     "chart.js": "^4.5.1",
+    "firebase": "^12.9.0",
     "framer-motion": "^12.28.1",
     "html-to-image": "^1.11.13",
     "lucide-react": "^0.563.0",

@@ -1,6 +1,6 @@
 // app/api/vapi/route.ts
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { supabase } from '../../utils/supabase'; // 경로 확인 필요
 
 export async function POST(req: Request) {
   try {
@@ -38,11 +38,6 @@ export async function POST(req: Request) {
       console.log(`[Vapi] Assistant Request for User: ${userId}`);
 
       try {
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
-
         // [Timeout] 1.5초 안에 DB 응답 없으면 포기 (Vapi Ejection 방지)
         const memoryPromise = supabase
           .from('memories')
@@ -96,10 +91,6 @@ export async function POST(req: Request) {
 
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY && userId && summary) {
         console.log(`[Vapi] Saving Memory: ${summary}`);
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
         // 비동기 저장
         supabase.from('memories').insert({ user_id: userId, summary }).then();
       }
