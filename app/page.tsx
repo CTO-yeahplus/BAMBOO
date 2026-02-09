@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
-import { Book, X, Star, Share2, Disc, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Settings2, Volume2, Mic, LogIn, Flame, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, Keyboard, SendHorizontal, Palette, Mail, Moon, Bed, Square, PenTool, ImageIcon } from 'lucide-react';
+import { Book, X, Star, Share2, ShoppingBag, Disc, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Settings2, Volume2, Mic, LogIn, Flame, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, Keyboard, SendHorizontal, Palette, Mail, Moon, Bed, Square, PenTool, ImageIcon } from 'lucide-react';
 import { MemoryGalleryModal, FullImageViewer } from './components/MemoryGalleryModal';
 import { useBambooEngine } from './hooks/useBambooEngine';
 import { useRipple } from './hooks/useRipple';
@@ -13,14 +13,18 @@ import { InstallPrompt } from './components/InstallPrompt';
 import { ForestGuide } from './components/ForestGuide';
 import { supabase } from './utils/supabase'; 
 import { IntroSequence } from './components/IntroSequence';
-import { MailboxModal } from './components/modals';
-import { JournalModal } from './components/modals';
+import { MailboxModal, JournalModal } from './components/modals';
+import { CelestialBody } from './components/visuals/CelestialBody';
+import { PaymentModal } from './components/modals';
+
 // Components
 import { MemoryLantern, ForestBackground, LivingSpirit, SpiritRenderer, SoulTree, FireflyLayer, FloatingBottle, BurningPaperEffect, MemoryFlower, GoldenCocoon, SpringPetal, SummerFirefly, AutumnLeaf, ConstellationLayer, OrbitLayer} from './components/visuals';
 import { OracleModal, SettingsModal, AltarModal, ProfileModal, BottleModals, FireRitualModal, SoulCalendarModal, SoulographyModal, SpiritCapsuleModal} from './components/modals'; // index.ts 덕분에 폴더명만 써도 됨
 import { MemoryRitual } from './components/MemoryRitual';
 import { TimeCapsuleModal } from './components/TimeCapsuleModal';
 import { GenesisRitual } from './components/GenesisRitual';
+import { useVapiLimit } from './hooks/useVapiLimit';
+import { SpiritEnergy } from './components/ui/SpiritEnergy';
 
 // [New] UI Components
 import { MagicSatchel, MinimalAmbience } from './components/ForestControls';
@@ -31,22 +35,45 @@ const SOUL_LEVELS: { [key: number]: { name: string, color: string } } = { 1: { n
 
 export default function BambooForest() {
   const engine = useBambooEngine();
-  const [showIntro, setShowIntro] = useState(true); // 👈 인트로 상태 추가
+  const [showIntro, setShowIntro] = useState(true);
+  const [showShop, setShowShop] = useState(false);
+  // 2. [State] 데모용 유료 상태 (DB의 isPremium과 합쳐서 사용)
+  const [demoPremium, setDemoPremium] = useState(false);
   
   const { 
-    user, isPremium, memories, 
+    user, memories, 
     bgVolume, voiceVolume, 
     motionValues, hasWoken, callStatus, isSilentMode,
     fireflies, broadcastTouch,
-    resonance,
+    resonance, isPremium: dbPremium, 
     // Bottle functions
     sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle, replyToBottle,
     showFireRitual, setShowFireRitual, performFireRitual, saveVoiceCapsule,
-    spiritForm, SPIRIT_FORMS, changeSpiritForm
+    spiritForm, SPIRIT_FORMS, changeSpiritForm, stopVapi
   } = engine;
+
+  // 3. [Logic] 실제 유료 여부 판단 (DB 정보 OR 결제 직후 데모 상태)
+  const isEffectivePremium = dbPremium || demoPremium;
 
   const currentThemeConfig = THEMES.find(t => t.id === engine.currentTheme) || THEMES[0];
   const { ripples, addRipple } = useRipple();
+  // 1. 유료 회원 상태 & 상점 모달 상태
+  const [isPremium, setIsPremium] = useState(false); 
+
+  // 2. Vapi 연결 상태 정의 (engine.callStatus 활용)
+  const isVapiConnected = engine.callStatus !== 'idle';
+
+  // 3. 사용량 훅 연결 (Snippet 적용)
+  const { progress, isLimitReached } = useVapiLimit(
+      isPremium, 
+      isVapiConnected, 
+      () => {
+          // 🛑 시간 초과 시 실행될 콜백
+          if (stopVapi) stopVapi(); // 함수 존재 여부 체크 후 실행
+          alert("정령과의 공명이 희미해졌습니다. 내일 다시 오거나, 에너지를 충전하세요.");
+          setShowShop(true); // 상점 자동 열기
+      }
+  );
   
   // Local UI States
   const [showCapsuleModal, setShowCapsuleModal] = useState(false);
@@ -108,6 +135,19 @@ export default function BambooForest() {
     });
   }, [memories]);
 
+  // 👇 [New] 마우스 움직임 추적을 위한 MotionValue 생성
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  // 👇 [New] 마우스 이벤트 핸들러
+  const handleMouseMove = (e: React.MouseEvent) => {
+      // 화면 중앙을 기준으로 -1 ~ 1 사이의 값으로 정규화
+      const { clientX, clientY } = e;
+      const { innerWidth, innerHeight } = window;
+      mouseX.set((clientX / innerWidth) * 2 - 1);
+      mouseY.set((clientY / innerHeight) * 2 - 1);
+  };
+
   useEffect(() => {
       const newParticles = Array.from({ length: 100 }).map((_, i) => ({ id: i, x: Math.random() * 100, y: Math.random() * 100, size: Math.random() * 3 + 1, duration: Math.random() * 5 + 2, delay: Math.random() * 2 }));
       setParticles(newParticles);
@@ -122,7 +162,7 @@ export default function BambooForest() {
   const cinematicTransition = { duration: 2.5, ease: "easeInOut" } as const;
   
   // [Fix] 캘린더가 열릴 때, 해당 월의 감정 데이터를 가져옵니다.
-  // 👇 [Modified] 전체 메모리를 가져오도록 수정 (Supabase 연동)
+  // 전체 메모리를 가져오도록 수정 (Supabase 연동)
   useEffect(() => {
     if (engine.showCalendar && user) {
         console.log(`📅 Calendar Opened: Fetching all memories for user ${user.id}`);
@@ -145,8 +185,9 @@ export default function BambooForest() {
     }
   }, [engine.showCalendar, user]);
 
+
   return (
-    <main className="relative flex flex-col items-center justify-center w-full h-screen overflow-hidden bg-black touch-none" onMouseMove={(e) => {}} onPointerDown={handleGlobalClick}>
+    <main className="relative flex flex-col items-center justify-center w-full h-screen overflow-hidden bg-black touch-none" onMouseMove={(e) => {handleMouseMove(e);}} onPointerDown={handleGlobalClick} >
       
       {/* [Critical Fix] ID 직통 케이블 연결 (오디오 레이어) */}
         <div style={{ display: 'none' }}>
@@ -247,9 +288,13 @@ export default function BambooForest() {
             
             {engine.sleepTimer !== null && ( <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.85 }} exit={{ opacity: 0 }} transition={{ duration: 3 }} className="absolute inset-0 z-20 bg-black pointer-events-none" /> )}
 
-            <motion.div className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none z-0 mix-blend-screen" style={{ x: moonX, y: moonY }}>
-                {engine.isDaytime ? ( <div className="relative w-32 h-32 opacity-90"><div className="absolute inset-0 bg-orange-200/30 blur-[60px] rounded-full" /></div> ) : ( <div className="relative w-32 h-32 opacity-80"><svg viewBox="0 0 24 24" className="w-full h-full text-yellow-100 blur-[0.5px] drop-shadow-[0_0_15px_rgba(255,255,200,0.5)]"><path d={moonPath} fill="currentColor" /></svg><div className="absolute inset-0 bg-yellow-100/20 blur-[50px] rounded-full" /></div> )}
-            </motion.div>
+            {/* ☀️ Celestial Body (Sun/Moon) */}
+            <CelestialBody 
+                isDaytime={engine.isDaytime} 
+                moonPath={moonPath}
+                mouseX={mouseX} // 👈 전달
+                mouseY={mouseY} // 👈 전달
+            />
             
             <FireflyLayer fireflies={fireflies} />
 
@@ -582,6 +627,54 @@ export default function BambooForest() {
             )}
         </AnimatePresence>
 
+        {/* 👇 [수정] 상점 버튼 (위치를 우측 상단으로 이동 & 디자인 강화) */}
+        <motion.button
+            onClick={() => setShowShop(true)}
+            // 위치: fixed top-6 right-6 (화면 우측 상단 고정)
+            // z-index: z-[100] (가장 위에 표시)
+            className="fixed top-25 right-8 z-[10] p-3 bg-black/10 backdrop-blur-xl rounded-full border border-white/10 text-white/70 hover:text-amber-200 hover:bg-black/30 hover:border-amber-500/30 transition-all] group"
+            whileHover={{ scale: 1.1, rotate: 5 }}
+            whileTap={{ scale: 0.9 }}
+        >
+            {/* 아이콘: 쇼핑백 대신 '보석'이나 '선물' 아이콘 추천 */}
+            <div className="relative">
+                <ShoppingBag size={20} className="drop-shadow-md" />
+                
+                {/* 반짝이는 효과 (알림 점) */}
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse shadow-[0_0_8px_#f59e0b]" />
+            </div>
+            
+            {/* 툴팁 (Hover 시 표시) */}
+            <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-2 py-1 bg-black/80 backdrop-blur text-[10px] text-amber-100 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                Spirit Shop
+            </span>
+        </motion.button>
+
+        {/* 좌측 상단: 정령 에너지 게이지 */}
+        <div className="fixed top-25 left-7 z-[10]">
+                <SpiritEnergy 
+                    progress={progress} 
+                    isPremium={isEffectivePremium} // 👈 수정된 변수 사용
+                    onUpgradeClick={() => setShowShop(true)}
+                />
+        </div>
+
+        {/* 결제 모달 */}
+        <AnimatePresence>
+            {showShop && (
+                <PaymentModal 
+                    isOpen={showShop} 
+                    onClose={() => setShowShop(false)} 
+                    userName={user?.email?.split('@')[0] || "Traveler"}
+                    isPremium={isEffectivePremium}
+                    onSuccess={() => {
+                        setDemoPremium(true); // 👈 결제 성공 시 즉시 유료 모드 활성화
+                        setShowShop(false);
+                    }} 
+                />
+            )}
+    </AnimatePresence>
+
         {/* --- MODALS --- */}
         {/* 👇 DailyOracleModal 연결 수정 */}
         <OracleModal 
@@ -716,7 +809,8 @@ export default function BambooForest() {
             />
           )}
         </AnimatePresence>
-        </motion.div>
+
+    </motion.div>
     </main>
   );
 }

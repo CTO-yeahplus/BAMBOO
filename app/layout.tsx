@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Inter, Noto_Serif_KR } from "next/font/google"; // 폰트는 쓰시던 것 유지
 import "./globals.css";
+import Script from 'next/script';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -71,7 +72,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className={`${inter.className} bg-[#050505] overflow-hidden`}>
+      <body>
+        {/* 👇 포트원 SDK 추가 (jQuery 필요 없음) */}
+        <Script src="https://cdn.iamport.kr/v1/iamport.js" strategy="beforeInteractive" />
         {children}
       </body>
     </html>

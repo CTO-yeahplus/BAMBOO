@@ -13,7 +13,7 @@ type PersonaStyle = {
 };
 
 const PERSONA_STYLES: Record<string, PersonaStyle> = {
-    spirit: { core: '#fbbf24', glow: '#f59e0b', aura: 'rgba(251, 191, 36, 0.2)', blend: 'mix-blend-screen' },
+    spirit: { core: '#ffd86f', glow: '#ffa740', aura: 'rgba(251, 191, 36, 0.2)', blend: 'mix-blend-screen' },
     shadow: { core: '#7f1d1d', glow: '#ef4444', aura: 'rgba(0,0,0,0.8)', blend: 'mix-blend-hard-light' }, 
     light: { core: '#fbcfe8', glow: '#f472b6', aura: 'rgba(244, 114, 182, 0.3)', blend: 'mix-blend-screen' } 
 };
@@ -63,7 +63,7 @@ export const LivingSpirit = ({
         >
             {/* Aura */}
             <motion.div 
-                className={`absolute inset-0 rounded-full blur-[60px] ${style.blend}`}
+                className={`absolute inset-0 rounded-full blur-[60px] ${style.blend} `}
                 style={{ backgroundColor: style.aura }}
                 animate={{ scale: [0.9, 1.1, 0.9], opacity: isShadow ? [0.6, 0.8, 0.6] : [0.3, 0.5, 0.3] }}
                 transition={{ duration: 8, repeat: Infinity }}

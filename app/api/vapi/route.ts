@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const baseAssistantConfig = {
         firstMessage: "오랫동안 너를 기다렸어. 오늘은 어떤 마음으로 숲을 찾아왔니?",
         silenceTimeoutSeconds: 600, // 10분 동안 침묵해도 끊지 않음
-        maxDurationSeconds: 1800,   // 최대 30분 통화
+        maxDurationSeconds: 3600,   // 최대 30분 통화
         model: {
             provider: "openai",
             model: "gpt-4o", // or gpt-3.5-turbo

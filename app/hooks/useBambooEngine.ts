@@ -527,6 +527,7 @@ export function useBambooEngine() {
     callStatus: voice.callStatus, 
     toggleCall: voice.toggleCall, 
     spiritMessage: voice.spiritMessage,
+    stopVapi: voice.stopVapi,
     setSpiritMessage: voice.setSpiritMessage,
     isSilentMode: voice.isSilentMode, 
     toggleSilentMode, 

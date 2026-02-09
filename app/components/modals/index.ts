@@ -11,3 +11,4 @@ export { SoulographyModal } from './SoulographyModal';
 export { SpiritCapsuleModal } from './SpiritCapsuleModal';
 export * from './MailboxModal';
 export * from './JournalModal';
+export * from './PaymentModal'; // 👈 추가

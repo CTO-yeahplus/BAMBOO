@@ -26,8 +26,8 @@ export function useSpiritVapi(
   const vapiRef = useRef<any>(null);
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [currentPersona, setCurrentPersona] = useState<PersonaType>('spirit');
-  
   const { requestWakeLock, releaseWakeLock } = useWakeLock();
+
 
   // 감정 분석 로직
   const analyzeEmotion = useCallback((text: string) => {
@@ -86,14 +86,21 @@ export function useSpiritVapi(
     };
   }, [onCallEnd, analyzeEmotion, requestWakeLock, releaseWakeLock]);
 
+  // 👇 [추가] 명시적인 연결 종료 함수 (useVapiLimit에서 사용)
+  const stopVapi = useCallback(() => {
+    if (callStatus !== 'idle') {
+        console.log("🛑 Force Stopping Vapi (Limit Reached or User Action)...");
+        vapiRef.current?.stop();
+        setCallStatus('idle');
+        releaseWakeLock();
+    }
+  }, [callStatus, releaseWakeLock]);
+
   // [Core Logic] 통화 시작/종료 토글 (페르소나 반영)
   const toggleCall = useCallback(async () => {
     // 1. 통화 중이면 종료
     if (callStatus !== 'idle') {
-        console.log("🛑 Stopping Call...");
-        vapiRef.current?.stop();
-        setCallStatus('idle');
-        releaseWakeLock();
+        stopVapi();
         return;
     }
 
@@ -117,7 +124,7 @@ export function useSpiritVapi(
         alert("Connection Failed. Check console.");
     }
 
-  }, [callStatus, currentPersona, releaseWakeLock]);
+  }, [callStatus, currentPersona, releaseWakeLock, stopVapi]);
 
   // [New] 페르소나 변경 (의식)
   const changePersona = useCallback(async (personaId: PersonaType) => {
@@ -153,10 +160,13 @@ export function useSpiritVapi(
       }
   }, [callStatus, analyzeEmotion]);
 
+  
+
   return { 
       vapiRef, 
       callStatus, 
-      toggleCall, 
+      toggleCall,
+      stopVapi, 
       spiritMessage, 
       setSpiritMessage, 
       isSilentMode, 
