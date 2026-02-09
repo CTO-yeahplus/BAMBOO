@@ -64,15 +64,15 @@ export default function BambooForest() {
   const isVapiConnected = engine.callStatus !== 'idle';
 
   // 3. 사용량 훅 연결 (Snippet 적용)
-  const { progress, isLimitReached } = useVapiLimit(
-      isPremium, 
-      isVapiConnected, 
-      () => {
-          // 🛑 시간 초과 시 실행될 콜백
-          if (stopVapi) stopVapi(); // 함수 존재 여부 체크 후 실행
-          alert("정령과의 공명이 희미해졌습니다. 내일 다시 오거나, 에너지를 충전하세요.");
-          setShowShop(true); // 상점 자동 열기
-      }
+  const { progress, isLimitReached, credits, refillEnergy } = useVapiLimit(
+    isEffectivePremium, 
+    isVapiConnected,
+    () => {
+        // 🛑 시간 초과 시 실행될 콜백
+        if (stopVapi) stopVapi(); // 함수 존재 여부 체크 후 실행
+        alert("모든 정령 코인을 소진했습니다. 다음 달에 충전됩니다.");
+        setShowShop(true); // 상점 자동 열기
+    }
   );
   
   // Local UI States
@@ -653,7 +653,8 @@ export default function BambooForest() {
         {/* 좌측 상단: 정령 에너지 게이지 */}
         <div className="fixed top-25 left-7 z-[10]">
                 <SpiritEnergy 
-                    progress={progress} 
+                    progress={progress}
+                    credits={credits} 
                     isPremium={isEffectivePremium} // 👈 수정된 변수 사용
                     onUpgradeClick={() => setShowShop(true)}
                 />
@@ -667,9 +668,15 @@ export default function BambooForest() {
                     onClose={() => setShowShop(false)} 
                     userName={user?.email?.split('@')[0] || "Traveler"}
                     isPremium={isEffectivePremium}
-                    onSuccess={() => {
-                        setDemoPremium(true); // 👈 결제 성공 시 즉시 유료 모드 활성화
-                        setShowShop(false);
+                    // 👇 [핵심] 결제 성공 콜백 처리
+                    onSuccess={(productType, amount) => {
+                        if (productType === 'subscription') {
+                            setDemoPremium(true); // 구독 활성화 -> 60코인 한도 적용
+                            alert("Moonlight Pass가 활성화되었습니다. 이제 월 60코인을 사용합니다.");
+                        } else if (productType === 'refill') {
+                            refillEnergy(amount); // 충전 활성화 -> 코인 즉시 추가
+                            alert(`${amount} 코인이 충전되었습니다!`);
+                        }
                     }} 
                 />
             )}

@@ -9,9 +9,10 @@ interface ModalOverlayProps {
     children: React.ReactNode;
     title?: string;
     subtitle?: string;
+    maxWidth?: string;
 }
 
-export const ModalOverlay = ({ onClose, children, title, subtitle }: ModalOverlayProps) => {
+export const ModalOverlay = ({ onClose, children, title, subtitle, maxWidth = 'max-w-lg' }: ModalOverlayProps) => {
     const sound = useUISound();
     const playSwoosh = sound?.playSwoosh || (() => {});
     const playTick = sound?.playTick || (() => {});
@@ -57,7 +58,8 @@ export const ModalOverlay = ({ onClose, children, title, subtitle }: ModalOverla
                         console.log("⚪ [ModalOverlay] Inner Content Clicked (Propagtion Stopped)");
                         e.stopPropagation();
                     }}
-                    className="relative w-full max-w-[340px] md:max-w-md bg-gradient-to-b from-[#1c1c22] to-[#0f0f12] border border-white/10 rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col ring-1 ring-white/5"                >
+                    className={`relative w-full ${maxWidth} max-h-[90vh] bg-[#0f0f13] border border-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden`}
+                    >
                         {/* Header Area */}
                     <div 
                         className="flex flex-col items-center justify-center pt-8 pb-4 px-6 relative z-10"
