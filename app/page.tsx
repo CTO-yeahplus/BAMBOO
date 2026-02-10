@@ -53,7 +53,7 @@ export default function BambooForest() {
   } = engine;
 
   // 3. [Logic] 실제 유료 여부 판단 (DB 정보 OR 결제 직후 데모 상태)
-  const isEffectivePremium = dbPremium || demoPremium;
+  const isEffectivePremium = true; //dbPremium || demoPremium;
 
   const currentThemeConfig = THEMES.find(t => t.id === engine.currentTheme) || THEMES[0];
   const { ripples, addRipple } = useRipple();
@@ -258,12 +258,6 @@ export default function BambooForest() {
             animate={{ opacity: showIntro ? 0 : 1 }} // 인트로 끝나면 1
             transition={{ duration: 2 }} // 2초 동안 천천히 밝아짐
         >
-        {/* [New] Genesis Ritual (Onboarding) */}
-        <AnimatePresence>
-          {engine.showOnboarding && (
-              <GenesisRitual onComplete={engine.handleOnboardingComplete} />
-          )}
-        </AnimatePresence>
 
         <InstallPrompt /> 
 
@@ -282,21 +276,7 @@ export default function BambooForest() {
                             <Wind size={16} />
                             <span className="text-xs tracking-[0.3em] font-serif">SOUL FOREST</span>
                         </motion.div>
-                        <div className="flex items-center gap-4">
-                            {/* ✨ Voice Selector (Premium Only) */}
-                            {isEffectivePremium && (
-                                <motion.button 
-                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                                    onClick={() => setIsVoiceSelectorOpen(true)}
-                                    className="text-white/40 hover:text-amber-300 transition-colors"
-                                >
-                                    <Sparkles size={18} />
-                                </motion.button>
-                            )}
-                            <motion.button onClick={() => setShowProfile(true)} className="text-white/50 hover:text-white transition-all">
-                                <User size={18} />
-                            </motion.button>
-                        </div>
+                        
                     </div>
 
                     {/* Glowing Touch Button */}
@@ -412,27 +392,6 @@ export default function BambooForest() {
             </AnimatePresence>
         </div>
 
-        {/* 3. Simplified Top Controls */}
-        <div className="absolute top-8 left-8 z-50 pointer-events-auto">
-            {hasWoken && callStatus === 'idle' && (
-                <motion.button onClick={engine.setShowJournal.bind(null, !engine.showJournal)} className="p-3 bg-white/10 rounded-full backdrop-blur-md border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                    {engine.showJournal ? <X size={20} /> : <Book size={20} />}
-                </motion.button>
-            )}
-        </div>
-
-        <div className="absolute top-8 right-8 z-50 pointer-events-auto">
-            {hasWoken && user && (
-                <motion.button 
-                    initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} 
-                    onClick={() => { engine.triggerLight(); setShowProfile(!showProfile); }} 
-                    className={`flex items-center justify-center w-12 h-12 bg-white/10 backdrop-blur-md border rounded-full text-white/90 hover:bg-white/20 transition-all shadow-lg overflow-hidden ${avatarBorderClass}`}
-                >
-                    <span className="text-lg font-bold">{getUserInitial()}</span>
-                </motion.button>
-            )}
-        </div>
-
         {/* 4. Unified Bottom Controls */}
         {hasWoken && callStatus === 'idle' && !engine.showJournal && !engine.isBreathing && (
             <>
@@ -444,17 +403,25 @@ export default function BambooForest() {
 
                 {/* Right Bottom: Magic Satchel (Unified Menu) */}
                 <MagicSatchel 
-                  isPremium={isPremium}
+                  isPremium={isEffectivePremium}
+                  credits={credits}
+                  progress={progress}
+                  hasUnreadMail={engine.letters.length > 0}
+                  onOpenSettings={() => engine.setShowSettings(true)}
                   hasCollectedDew={engine.hasCollectedDew}
-                  onCollectDew={engine.collectDew}
+                  onOpenProfile={() => setShowProfile(true)}
+                  onOpenShop={() => setShowShop(true)}
+                  onOpenVoice={() => setIsVoiceSelectorOpen(true)}
+                  onOpenJournal={() => engine.setShowJournal(true)}                
+                  onOpenGallery={() => engine.setShowGalleryModal(true)}
+                  onCollectDew={() => engine.collectDew && engine.collectDew()}
                   onOpenFire={() => setShowFireRitual(true)}
                   //onOpenBottle={() => setShowWriteBottle(true)}
                   onOpenBottle={() => engine.setWhisperOpen(true)}
                   onOpenCapsule={() => setShowCapsuleModal(true)}
-                  onOpenGallery={() => engine.setShowGalleryModal(true)}
                   onOpenCalendar={() => engine.setShowCalendar(true)}
                   onOpenMailbox={() => {
-                    if (isPremium) {
+                    if (isEffectivePremium) {
                       setShowMailbox(true);
                       // 월간 편지와 주간 리포트 모두 체크
                       if (engine.letters.length === 0) {
@@ -497,16 +464,6 @@ export default function BambooForest() {
                     }}
                 />
                 
-                {/* Left Bottom: Settings */}
-                <div className="absolute bottom-8 left-8 z-50 pointer-events-auto">
-                    <motion.button 
-                        onClick={() => { engine.triggerLight(); engine.setShowSettings(!engine.showSettings); }} 
-                        className={`p-3 rounded-full backdrop-blur-md border transition-all ${engine.showSettings ? 'bg-white/20 border-white/20 text-white' : 'bg-black/20 border-white/10 text-white/60 hover:bg-white/10'}`} 
-                        whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                    >
-                        <Settings2 size={20} />
-                    </motion.button>
-                </div>
             </>
         )}
 
@@ -551,6 +508,7 @@ export default function BambooForest() {
         )}
         </motion.div>
         </ForestBackground>
+        
         <VoiceSelectorModal isOpen={isVoiceSelectorOpen} onClose={() => setIsVoiceSelectorOpen(false)} userId={user?.id} currentVoiceId={currentVoiceId} onSelect={(id) => setCurrentVoiceId(id)} />
 
         {/* 👇 [New] 불타는 의식 시각 효과 (Fire Overlay) */}
@@ -617,62 +575,7 @@ export default function BambooForest() {
                     ))}
                 </motion.div>
             )}
-        </AnimatePresence>
-
-        {/* 👇 [수정] 상점 버튼 (위치를 우측 상단으로 이동 & 디자인 강화) */}
-        <motion.button
-            onClick={() => setShowShop(true)}
-            // 위치: fixed top-6 right-6 (화면 우측 상단 고정)
-            // z-index: z-[100] (가장 위에 표시)
-            className="fixed top-25 right-8 z-[10] p-3 bg-black/10 backdrop-blur-xl rounded-full border border-white/10 text-white/70 hover:text-amber-200 hover:bg-black/30 hover:border-amber-500/30 transition-all] group"
-            whileHover={{ scale: 1.1, rotate: 5 }}
-            whileTap={{ scale: 0.9 }}
-        >
-            {/* 아이콘: 쇼핑백 대신 '보석'이나 '선물' 아이콘 추천 */}
-            <div className="relative">
-                <ShoppingBag size={20} className="drop-shadow-md" />
-                
-                {/* 반짝이는 효과 (알림 점) */}
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse shadow-[0_0_8px_#f59e0b]" />
-            </div>
-            
-            {/* 툴팁 (Hover 시 표시) */}
-            <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-2 py-1 bg-black/80 backdrop-blur text-[10px] text-amber-100 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                Spirit Shop
-            </span>
-        </motion.button>
-
-        {/* 좌측 상단: 정령 에너지 게이지 */}
-        <div className="fixed top-25 left-7 z-[10]">
-                <SpiritEnergy 
-                    progress={progress}
-                    credits={credits} 
-                    isPremium={isEffectivePremium} // 👈 수정된 변수 사용
-                    onUpgradeClick={() => setShowShop(true)}
-                />
-        </div>
-
-        {/* 결제 모달 */}
-        <AnimatePresence>
-            {showShop && (
-                <PaymentModal 
-                    isOpen={showShop} 
-                    onClose={() => setShowShop(false)} 
-                    userName={user?.email?.split('@')[0] || "Traveler"}
-                    isPremium={isEffectivePremium}
-                    // 👇 [핵심] 결제 성공 콜백 처리
-                    onSuccess={(productType, amount) => {
-                        if (productType === 'subscription') {
-                            setDemoPremium(true); // 구독 활성화 -> 60코인 한도 적용
-                            alert("Moonlight Pass가 활성화되었습니다. 이제 월 60코인을 사용합니다.");
-                        } else if (productType === 'refill') {
-                            refillEnergy(amount); // 충전 활성화 -> 코인 즉시 추가
-                            alert(`${amount} 코인이 충전되었습니다!`);
-                        }
-                    }} 
-                />
-            )}
-    </AnimatePresence>
+        </AnimatePresence>        
 
         {/* --- MODALS --- */}
         {/* 👇 DailyOracleModal 연결 수정 */}
@@ -761,7 +664,7 @@ export default function BambooForest() {
         
         <MemoryRitual 
             isOpen={engine.showMemoryRitual} onClose={() => engine.setShowMemoryRitual(false)} 
-            user={user} isPremium={isPremium} onFinalize={engine.finalizeMemory} onSaveCapsule={engine.saveVoiceCapsule} 
+            user={user} isPremium={isEffectivePremium} onFinalize={engine.finalizeMemory} onSaveCapsule={engine.saveVoiceCapsule} 
         />
 
         {/* [New] The Guide */}
@@ -778,6 +681,18 @@ export default function BambooForest() {
             userName={user?.email?.split('@')[0] || "Traveler"}
         />
 
+        {/* 💰 PaymentModal: userId 제거, userName/isPremium 전달 */}
+        <PaymentModal 
+                isOpen={showShop} 
+                onClose={() => setShowShop(false)} 
+                userName={user?.email} 
+                isPremium={isEffectivePremium}
+                onSuccess={(type, amount) => {
+                    // 결제 성공 시 로직 (필요하면 리로드나 알림 추가)
+                    setShowShop(false);
+                }} 
+            />
+        
         {/* Gallery & Viewer */}
         <MemoryGalleryModal 
             isOpen={engine.showGalleryModal} onClose={() => engine.setShowGalleryModal(false)} 

@@ -1,109 +1,225 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // useEffect 추가
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-    Plus, X, Flame, Hourglass, Image as ImageIcon, 
-    Send, Droplets, Mail, ChevronUp, Trees, CloudRain, Wind, Calendar, Mic, Disc
+    User, ShoppingBag, Book, Mail, Sparkles, X, Menu,
+    Flame, Send, Image as ImageIcon, Calendar, Disc, Hourglass, Droplets,
+    ChevronUp, Zap, Trees, CloudRain, Wind, Settings2
 } from 'lucide-react';
 import { WeatherType } from '../types';
+import { SpiritEnergy } from './ui/SpiritEnergy'; 
 
-// 1. 통합 액션 메뉴 (우측 하단)
-export const MagicSatchel = ({ 
-    onOpenFire, onOpenBottle, onOpenCapsule, onOpenGallery, onOpenMailbox, onCollectDew,
-    hasCollectedDew, isPremium, onOpenCalendar, onOpenSpiritCapsules,
-    onOpenCapsules,
-}: any) => {
+interface ForestDockProps {
+    isPremium: boolean;
+    hasCollectedDew?: boolean;
+    hasUnreadMail?: boolean;
+    credits?: number; 
+    progress?: number; 
+
+    onOpenProfile: () => void;
+    onOpenSettings: () => void;
+    onOpenShop: () => void;
+    onOpenVoice?: () => void;
+    onOpenJournal: () => void;
+    onOpenMailbox: () => void;
+    onOpenFire: () => void;
+    onOpenBottle: () => void;
+    onOpenGallery: () => void;
+    onOpenCalendar: () => void;
+    onOpenSpiritCapsules: () => void;
+    onOpenCapsule: () => void;
+    onCollectDew: () => void;
+}
+
+export const MagicSatchel = ({
+    isPremium, hasCollectedDew, hasUnreadMail, credits, progress = 0,
+    onOpenProfile, onOpenSettings, onOpenShop, onOpenVoice,
+    onOpenJournal, onOpenMailbox, onOpenFire,
+    onOpenBottle, onOpenGallery, onOpenCalendar,
+    onOpenSpiritCapsules, onOpenCapsule, onCollectDew
+}: ForestDockProps) => {
     const [isOpen, setIsOpen] = useState(false);
 
-    const menuItems = [
-        { id: 'fire', icon: <Flame size={20} />, label: 'Ritual', action: onOpenFire, color: 'bg-red-500/20 text-red-200' },
-        { id: 'bottle', icon: <Send size={20} />, label: 'Whisper', action: onOpenBottle, color: 'bg-blue-500/20 text-blue-200' },
-        { id: 'mailbox', icon: <Mail size={20} />, label: 'Letter', action: onOpenMailbox, color: 'bg-yellow-500/20 text-yellow-200' },
-        { id: 'gallery', icon: <ImageIcon size={20} />, label: 'Gallery', action: onOpenGallery, color: 'bg-purple-500/20 text-purple-200' },
-        { id: 'calendar', icon: <Calendar size={20} />, label: 'Moods', action: onOpenCalendar, color: 'bg-green-500/20 text-green-200' },
-        // 정령 목소리 보관함 (Spirit Whispers)
-        { 
-            id: 'whisper', // 고유 ID (capsule과 겹치지 않게 변경)
-            icon: <Disc size={20} />, 
-            label: 'Spirit Whispers', 
-            action: onOpenSpiritCapsules, 
-            color: 'bg-indigo-500/20 text-indigo-200' 
-        },    ];
+    // 🕵️‍♂️ [디버깅] 데이터 추적 로그
+    useEffect(() => {
+        console.log(`[ForestDock] Current Props:`, { 
+            isPremium, 
+            hasCollectedDew, 
+            credits 
+        });
+    }, [isPremium, hasCollectedDew, credits]);
 
+    // 1. 기본 메뉴 정의
+    const baseMenuItems: any[] = [
+        { id: 'profile', icon: User, label: 'Profile', onClick: onOpenProfile },
+        { id: 'settings', icon: Settings2, label: 'Settings', onClick: onOpenSettings },
+        { id: 'shop', icon: ShoppingBag, label: 'Spirit Shop', onClick: onOpenShop },
+        
+        // Limit (Index: 3)
+        { id: 'limit', icon: Zap, label: 'Memory Limit', onClick: onOpenShop },
+
+        { id: 'journal', icon: Book, label: 'Journal', onClick: onOpenJournal },
+        { id: 'calendar', icon: Calendar, label: 'Moods', onClick: onOpenCalendar },
+        { id: 'gallery', icon: ImageIcon, label: 'Gallery', onClick: onOpenGallery },
+
+        { id: 'fire', icon: Flame, label: 'Ritual', onClick: onOpenFire, color: 'text-red-300' },
+        { id: 'bottle', icon: Send, label: 'Whisper', onClick: onOpenBottle, color: 'text-blue-300' },
+        { id: 'spirit', icon: Disc, label: 'Voices', onClick: onOpenSpiritCapsules, color: 'text-indigo-300' },
+    ];
+
+    // 2. 프리미엄 메뉴 주입 (Push/Splice 방식 사용 - 디버깅 용이)
     if (isPremium) {
-        menuItems.push({ id: 'capsule', icon: <Hourglass size={20} />, label: 'Capsule', action: onOpenCapsule, color: 'bg-amber-500/20 text-amber-200' });
+        // [Voice] Shop(2) 뒤, Limit(3) 앞 -> Index 3에 삽입
+        //console.log("[ForestDock] Adding Premium Item: Voice");
+        baseMenuItems.splice(3, 0, { 
+            id: 'voice', 
+            icon: Sparkles, 
+            label: 'Voice Select', 
+            onClick: onOpenVoice || (() => console.warn("No Voice Handler")), 
+            special: true 
+        });
+
+        baseMenuItems.splice(6, 0, { 
+            id: 'mailbox', 
+            icon: Mail, 
+            label: 'Mailbox', 
+            onClick: onOpenMailbox, 
+            badge: hasUnreadMail,
+            special: true 
+        });
+
+        // [Capsule] 맨 뒤에 추가
+        //console.log("[ForestDock] Adding Premium Item: Capsule");
+        baseMenuItems.push({ 
+            id: 'capsule', 
+            icon: Hourglass, 
+            label: 'Time Capsule', 
+            onClick: onOpenCapsule, 
+            special: true 
+        });
+    } else {
+        console.log("[ForestDock] User is NOT Premium. Skipping premium items.");
     }
 
+    // 3. 이슬 수집 추가
     if (!hasCollectedDew) {
-        menuItems.unshift({ id: 'dew', icon: <Droplets size={20} />, label: 'Dew', action: onCollectDew, color: 'bg-cyan-500/20 text-cyan-200' });
+        baseMenuItems.push({ id: 'dew', icon: Droplets, label: 'Collect Dew', onClick: onCollectDew, color: 'text-cyan-300' });
     }
+
+    // 최종 렌더링될 리스트 확인
+    // console.log("[ForestDock] Final Menu List:", baseMenuItems.map(i => i.id));
 
     return (
-        <div className="absolute bottom-8 right-8 z-50 flex flex-col items-end gap-3 pointer-events-auto">
-            <AnimatePresence>
-                {isOpen && (
-                    <motion.div 
-                        initial={{ opacity: 0, y: 20, scale: 0.8 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 20, scale: 0.8 }}
-                        transition={{ staggerChildren: 0.05 }}
-                        className="flex flex-col gap-3 items-end mb-2"
-                    >
-                        {menuItems.map((item) => (
-                            <motion.div key={item.id} className="flex items-center gap-3">
-                                <span className="text-white/80 text-xs font-medium bg-black/50 px-2 py-1 rounded backdrop-blur-sm shadow-sm">{item.label}</span>
-                                <motion.button
-                                    whileHover={{ scale: 1.1 }}
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={() => { item.action(); setIsOpen(false); }}
-                                    className={`p-3 rounded-full backdrop-blur-xl border border-white/10 shadow-lg ${item.color}`}
-                                >
-                                    {item.icon}
-                                </motion.button>
-                            </motion.div>
-                        ))}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+        <div className="absolute bottom-6 left-0 right-0 z-[60] flex justify-center items-end pointer-events-none">
+            <div className="pointer-events-auto">
+                <motion.div 
+                    layout
+                    className="flex items-center gap-2 p-2 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 shadow-2xl"
+                    initial={{ width: 56 }}
+                    animate={{ width: isOpen ? 'auto' : 56 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                >
+                    <AnimatePresence mode="popLayout">
+                        {isOpen && (
+                            <motion.div 
+                                className="flex items-center gap-1 pr-2 overflow-x-auto no-scrollbar max-w-[90vw] items-center"
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                            >
+                                {baseMenuItems.map((item) => {
+                                    if (item.id === 'limit') {
+                                        return (
+                                            <div key={item.id} className="shrink-0 mx-1">
+                                                <SpiritEnergy 
+                                                    progress={progress} 
+                                                    isPremium={isPremium} 
+                                                    credits={credits} 
+                                                    onUpgradeClick={onOpenShop} 
+                                                />
+                                            </div>
+                                        );
+                                    }
 
-            <motion.button
-                whileTap={{ scale: 0.9 }}
-                onClick={() => setIsOpen(!isOpen)}
-                className={`p-4 rounded-full backdrop-blur-xl border shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300 ${isOpen ? 'bg-white text-black rotate-45' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
-            >
-                <Plus size={24} />
-            </motion.button>
+                                    const specialStyle = item.special 
+                                        ? "bg-gradient-to-br from-amber-500/20 to-yellow-500/10 border-amber-500/40 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.2)] hover:shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:bg-amber-500/30"
+                                        : (item.color ? `hover:bg-white/10 ${item.color}` : 'text-white/60 hover:text-white hover:bg-white/10');
+
+                                    return (
+                                        <motion.button
+                                            key={item.id}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                item.onClick();
+                                            }}
+                                            className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all group shrink-0 border border-transparent
+                                                ${specialStyle}
+                                            `}
+                                            whileHover={{ scale: 1.15 }}
+                                            whileTap={{ scale: 0.9 }}
+                                        >
+                                            <item.icon size={20} className={`stroke-[1.5] ${item.special ? 'drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]' : ''}`} />
+                                            <span className="absolute -top-10 text-[10px] bg-black/90 border border-white/10 px-2 py-1 rounded text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                                                {item.label}
+                                            </span>
+                                            {item.badge && (
+                                                <span className={`absolute top-2 right-2 w-2 h-2 rounded-full animate-pulse shadow-lg ${typeof item.badge === 'boolean' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                                            )}
+                                        </motion.button>
+                                    );
+                                })}
+                                <div className="w-px h-6 bg-white/10 mx-2 shrink-0" />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <motion.button
+                        layout
+                        onClick={() => setIsOpen(!isOpen)}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors shrink-0
+                            ${isOpen ? 'bg-white/20 text-white' : 'bg-transparent text-white/80 hover:text-white'}
+                        `}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        <motion.div
+                            animate={{ rotate: isOpen ? 180 : 0 }}
+                            transition={{ duration: 0.3 }}
+                        >
+                            {isOpen ? <X size={22} /> : <Menu size={22} />}
+                        </motion.div>
+                    </motion.button>
+
+                </motion.div>
+            </div>
         </div>
     );
 };
 
-// 2. 미니멀 앰비언스 플레이어 (하단 중앙)
 export const MinimalAmbience = ({ currentAmbience, onChangeAmbience }: { currentAmbience: WeatherType, onChangeAmbience: (t: WeatherType) => void }) => {
     const [isExpanded, setIsExpanded] = useState(false);
-
     const sounds = [
-        { id: 'clear', icon: <Trees size={18} /> },
-        { id: 'rain', icon: <CloudRain size={18} /> },
-        { id: 'ember', icon: <Flame size={18} /> },
-        { id: 'snow', icon: <Wind size={18} /> },
+        { id: 'clear', icon: <Trees size={16} /> },
+        { id: 'rain', icon: <CloudRain size={16} /> },
+        { id: 'ember', icon: <Flame size={16} /> },
+        { id: 'snow', icon: <Wind size={16} /> },
     ];
-
     return (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 pointer-events-auto flex flex-col items-center gap-2">
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-40 pointer-events-auto flex flex-col items-center gap-2">
             <AnimatePresence>
                 {isExpanded && (
                     <motion.div 
                         initial={{ opacity: 0, y: 10, height: 0 }}
                         animate={{ opacity: 1, y: 0, height: 'auto' }}
                         exit={{ opacity: 0, y: 10, height: 0 }}
-                        className="flex gap-2 p-2 bg-black/40 backdrop-blur-xl rounded-full border border-white/10 mb-2"
+                        className="flex gap-1 p-1.5 bg-black/40 backdrop-blur-xl rounded-full border border-white/10 mb-2 shadow-xl"
                     >
                         {sounds.map((s) => (
                             <button 
                                 key={s.id}
                                 onClick={() => { onChangeAmbience(s.id as WeatherType); }}
-                                className={`p-3 rounded-full transition-all ${currentAmbience === s.id ? 'bg-white text-black' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
+                                className={`p-2.5 rounded-full transition-all ${currentAmbience === s.id ? 'bg-white text-black shadow-lg' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
                             >
                                 {s.icon}
                             </button>
@@ -111,15 +227,31 @@ export const MinimalAmbience = ({ currentAmbience, onChangeAmbience }: { current
                     </motion.div>
                 )}
             </AnimatePresence>
-
             <button 
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="flex items-center gap-2 px-5 py-3 bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 rounded-full text-white/70 transition-all active:scale-95"
+                className="flex items-center gap-2 px-4 py-2 bg-black/20 hover:bg-black/30 backdrop-blur-md border border-white/5 rounded-full text-white/60 transition-all active:scale-95 shadow-sm hover:border-white/20"
             >
                 {sounds.find(s => s.id === (currentAmbience || 'clear'))?.icon}
-                <span className="text-xs uppercase tracking-widest font-medium">Ambience</span>
-                <ChevronUp size={14} className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                <span className="text-[10px] uppercase tracking-[0.2em] font-medium opacity-80">Ambience</span>
+                <ChevronUp size={12} className={`transition-transform duration-300 opacity-50 ${isExpanded ? 'rotate-180' : ''}`} />
             </button>
         </div>
+    );
+};
+
+interface ForestControlsProps extends ForestDockProps {
+    currentAmbience: WeatherType;
+    onChangeAmbience: (t: WeatherType) => void;
+}
+
+export const ForestControls = (props: ForestControlsProps) => {
+    return (
+        <>
+            <MinimalAmbience 
+                currentAmbience={props.currentAmbience} 
+                onChangeAmbience={props.onChangeAmbience} 
+            />
+            <MagicSatchel {...props} />
+        </>
     );
 };

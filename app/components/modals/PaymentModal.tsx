@@ -37,7 +37,7 @@ export const PaymentModal = ({ isOpen, onClose, userName = "Traveler", isPremium
     
     useEffect(() => {
         if (typeof window !== 'undefined' && window.IMP) {
-            window.IMP.init('MOI0704643'); 
+            window.IMP.init('imp14397622'); 
         }
     }, []);
 
