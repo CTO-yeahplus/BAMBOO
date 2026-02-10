@@ -1,7 +1,6 @@
 // app/hooks/engine/useSoulData.ts
 
 import { useState, useEffect, useCallback } from 'react';
-// 👇 [Fix] 싱글톤 Supabase Client 가져오기 (app/utils/supabase.ts가 존재해야 함)
 import { supabase } from '../../utils/supabase'; 
 import { Memory, Artifact, ARTIFACTS, ORACLE_DECK, OracleCard, WhisperBottle, SANCTUARY_ITEMS } from '../../types';
 import { SpiritFormType, SPIRIT_FORMS, DailyMood, EMOTION_COLORS } from '../../types'; 
@@ -113,6 +112,41 @@ export function useSoulData(user: any, triggerSuccess: () => void, isPremium: bo
       const { data } = await supabase.from('soul_letters').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
       if (data) setLetters(data);
   }, [user]);
+
+  // 🌟 [New] 기억 생성 (Create)
+  const createMemory = async (content: string, summary?: string, emotion: string = 'neutral') => {
+      if (!user) return;
+      try {
+          const { error } = await supabase.from('memories').insert({
+              user_id: user.id,
+              content: content,
+              summary: summary || content.slice(0, 50),
+              emotion: emotion,
+              is_capsule: false
+          });
+          
+          if (error) throw error;
+          
+          console.log("✅ Memory Created");
+          fetchMemories(); // 목록 갱신
+          triggerSuccess(); // 햅틱 피드백
+      } catch (e) {
+          console.error("Failed to create memory:", e);
+      }
+  };
+
+  // 🌟 [New] 기억 삭제 (Delete)
+  const deleteMemory = async (id: number) => {
+      try {
+          const { error } = await supabase.from('memories').delete().eq('id', id);
+          if (error) throw error;
+          
+          console.log("🗑️ Memory Deleted:", id);
+          fetchMemories(); // 목록 갱신
+      } catch (e) {
+          console.error("Failed to delete memory:", e);
+      }
+  };
 
   // --- [Oracle Logic (Restored)] ---
 
@@ -500,6 +534,7 @@ export function useSoulData(user: any, triggerSuccess: () => void, isPremium: bo
   return { 
       // Memories & Letters
       memories, fetchMemories, 
+      createMemory, deleteMemory,
       letters, generateMonthlyLetter, generateWeeklyReport,
       
       // Economy & Items

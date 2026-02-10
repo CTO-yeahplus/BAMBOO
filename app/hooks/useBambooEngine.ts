@@ -8,7 +8,9 @@ import { useParallax } from './useParallax';
 import { usePushNotification } from './usePushNotification';
 import { useSoulData } from './engine/useSoulData';
 import { useSpiritVapi } from './engine/useSpiritVapi';
+import { supabase } from '../utils/supabase'; // 👈 [New] Supabase 클라이언트 Import
 import { ARTIFACTS, TIME_THEMES, EMOTION_COLORS, WeatherType, SeasonType,THEMES, ThemeId, PersonaType } from '../types';
+import { ORACLE_DECK } from '../types';
 
 const DAILY_QUOTES = [
   "천천히 가도 괜찮아, 방향만 맞다면.", "비바람이 불어야 뿌리가 단단해지는 법이야.",
@@ -16,8 +18,6 @@ const DAILY_QUOTES = [
   "어둠은 별을 빛나게 할 뿐, 너를 삼키지 못해.", "오늘 흘린 땀은 내일의 웃음이 될 거야.",
   "가장 깊은 밤이 지나야 새벽이 온다.", "너의 속도로 걸어가도 돼."
 ];
-
-import { ORACLE_DECK } from '../types';
 
 export function useBambooEngine() {
 // -----------------------------------------------------------
@@ -53,10 +53,27 @@ export function useBambooEngine() {
 
   }, [triggerMedium]);
 
-  const handleCallEnd = useCallback(() => {
+  const handleCallEnd = useCallback(async (history: {role: string, content: string}[]) => {
     triggerLight();
-    soul.fetchMemories();
-  }, [triggerLight, soul]);
+
+    if (!history || history.length === 0) {
+        // 대화가 없었더라도 목록은 최신화
+        soul.fetchMemories();
+        return;
+    }
+
+    // 대화 내용을 텍스트로 변환
+    const fullContent = history
+        .map(msg => `${msg.role === 'user' ? 'Traveler' : 'Spirit'}: ${msg.content}`)
+        .join('\n');
+
+    console.log("💾 Saving conversation...");
+    
+    // soul.createMemory 호출 (현재 감정 포함)
+    await soul.createMemory(fullContent, "대화의 기록", currentEmotion);
+
+  }, [triggerLight, soul, currentEmotion]);
+  
   // [New] Soulography State
   const [showSoulography, setShowSoulography] = useState(false);
   const [soulographyType, setSoulographyType] = useState<'calendar' | 'letter'>('calendar');
@@ -103,6 +120,7 @@ export function useBambooEngine() {
   };
 
   const voice = useSpiritVapi(user?.id ?? null, handleCallEnd, handleEmotionDetected);
+  
   const [currentTheme, setCurrentTheme] = useState<ThemeId>('bamboo');
   //const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({ clear: null, rain: null, snow: null, ember: null });
   const fadeIntervals = useRef<{ [key in WeatherType]: NodeJS.Timeout | null }>({ clear: null, rain: null, snow: null, ember: null });
@@ -428,14 +446,41 @@ export function useBambooEngine() {
       if (savedVoice) setVoiceVolume(parseFloat(savedVoice));
   }, []);
 
+  // 🌟 [Fix] finalizeMemory (수동 저장)
   const finalizeMemory = async (type: 'standard'|'capsule', summary: string, uid: string) => {
-      console.log(`Saved ${type}: ${summary}`);
-      setShowMemoryRitual(false);
-      triggerSuccess();
-      soul.fetchMemories();
+    console.log(`Saved ${type}: ${summary}`);
+    
+    // 단순 텍스트 메모 저장
+    if (type === 'standard') {
+        await soul.createMemory(summary, summary, 'neutral');
+    } 
+    // 캡슐은 별도 로직(saveVoiceCapsule)이 이미 있으므로 패스
+
+    setShowMemoryRitual(false);
+    // triggerSuccess는 createMemory 내부에서 호출됨
   };
-  const deleteMemory = async (id: number) => { if (!confirm("Delete?")) return; soul.fetchMemories(); };
-  const shareMemory = async (m: any) => {};
+
+  // 🌟 [Fix] deleteMemory (삭제)
+  const deleteMemory = async (id: number) => { 
+    if (!confirm("이 기억을 정말 지우시겠습니까?")) return; 
+    await soul.deleteMemory(id); 
+  };
+
+  // 🌟 [Fix] shareMemory (공유 - 추후 구현)
+  const shareMemory = async (m: any) => {
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'Soul Forest Memory',
+                text: m.content,
+            });
+        } catch (e) {
+            console.log('Share canceled');
+        }
+    } else {
+        alert("공유하기가 지원되지 않는 환경입니다.");
+    }
+  };
 
   const getStatusText = useCallback(() => {
     switch (voice.callStatus) {
@@ -533,6 +578,7 @@ export function useBambooEngine() {
     toggleSilentMode, 
     sendTextMessage: voice.sendTextMessage, 
     getStatusText,
+    setVoiceId: voice.setVoiceId, // 👈 [New] Voice ID 설정 함수 노출
 
     // 4. Soul Data (Profile & Items)
     resonance: soul.resonance, 

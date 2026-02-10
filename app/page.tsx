@@ -104,7 +104,11 @@ export default function BambooForest() {
     const fetchVoice = async () => {
         if (user && isEffectivePremium) {
             const { data } = await supabase.from('profiles').select('voice_id').eq('id', user.id).single();
-            if (data?.voice_id) setCurrentVoiceId(data.voice_id);
+            if (data?.voice_id) {
+                setCurrentVoiceId(data.voice_id);
+                // 🌟 [Fix] 불러온 목소리를 엔진에도 알려줍니다.
+                if (engine.setVoiceId) engine.setVoiceId(data.voice_id);
+            }
         }
     };
     fetchVoice();
@@ -509,7 +513,22 @@ export default function BambooForest() {
         </motion.div>
         </ForestBackground>
         
-        <VoiceSelectorModal isOpen={isVoiceSelectorOpen} onClose={() => setIsVoiceSelectorOpen(false)} userId={user?.id} currentVoiceId={currentVoiceId} onSelect={(id) => setCurrentVoiceId(id)} />
+        <VoiceSelectorModal 
+            isOpen={isVoiceSelectorOpen} 
+            onClose={() => setIsVoiceSelectorOpen(false)} 
+            userId={user?.id} 
+            currentVoiceId={currentVoiceId} 
+            onSelect={(id) => {
+                // 1. UI 반영
+                setCurrentVoiceId(id);
+                
+                // 2. 🌟 [Fix] 엔진에 즉시 반영
+                if (engine.setVoiceId) {
+                    engine.setVoiceId(id);
+                    console.log("Voice updated in Engine:", id);
+                }
+            }} 
+        />
 
         {/* 👇 [New] 불타는 의식 시각 효과 (Fire Overlay) */}
         <AnimatePresence>

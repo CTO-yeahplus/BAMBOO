@@ -4,8 +4,7 @@ import Vapi from '@vapi-ai/web';
 import { CallStatus, WeatherType, SOUL_MASKS, PersonaType } from '../../types';
 import { useWakeLock } from '../useWakeLock';
 
-// 🚀 [핵심 1] Vapi 인스턴스를 컴포넌트 '밖'으로 뺐습니다. (싱글톤 패턴)
-// 이제 리렌더링되어도 인스턴스가 계속 새로 생기지 않아 'KrispSDK 중복' 에러가 사라집니다.
+// Vapi 인스턴스 (싱글톤)
 const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY || '');
 
 const EMOTION_MAP: Record<string, WeatherType> = {
@@ -22,52 +21,60 @@ const EMOTION_MAP: Record<string, WeatherType> = {
 
 export function useSpiritVapi(
     userId: string | null, 
-    onCallEnd: () => void,
+    onCallEnd: (history: {role: string, content: string}[]) => void, // 👈 [수정] 대화 기록을 받도록 타입 변경
     onEmotionDetected?: (weather: WeatherType) => void 
 ) {
   const [spiritMessage, setSpiritMessage] = useState<string | null>(null);
   const [isSilentMode, setIsSilentMode] = useState(false);
-  const vapiRef = useRef<any>(vapi); // 외부 인스턴스 참조
+  const vapiRef = useRef<any>(vapi);
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [currentPersona, setCurrentPersona] = useState<PersonaType>('spirit');
   const { requestWakeLock, releaseWakeLock } = useWakeLock();
+  
+  const [preferredVoiceId, setPreferredVoiceId] = useState<string | null>(null);
 
-  // 감정 분석 로직
+  // 📝 [New] 대화 기록 저장소 (Ref로 관리하여 리렌더링 방지)
+  const transcriptHistoryRef = useRef<{role: string, content: string}[]>([]);
+
   const analyzeEmotion = useCallback((text: string) => {
       if (!onEmotionDetected) return;
       for (const [keyword, weather] of Object.entries(EMOTION_MAP)) {
           if (text.includes(keyword)) {
-              console.log(`[Emotive Weather] Detected: ${keyword} -> ${weather}`);
               onEmotionDetected(weather);
               break; 
           }
       }
   }, [onEmotionDetected]);
 
-  // 이벤트 리스너 등록 (Mount 시 1회)
   useEffect(() => {
     const onCallStart = () => {
-        console.log('📞 Vapi Call Started');
         setCallStatus('active');
         requestWakeLock();
+        transcriptHistoryRef.current = []; // 📝 통화 시작 시 기록 초기화
     };
 
     const onCallEndHandler = () => { 
-        console.log('🛑 Vapi Call Ended');
         setCallStatus('idle'); 
         releaseWakeLock();
-        onCallEnd(); 
+        // 📝 [핵심] 통화 종료 시, 모아둔 대화 기록을 상위로 전달
+        onCallEnd(transcriptHistoryRef.current); 
     };
 
     const onSpeechStart = () => setCallStatus('listening');
     const onSpeechEnd = () => setCallStatus('processing');
     
     const onMessage = (message: any) => {
-      if (message.type === 'transcript') {
-          if (message.transcriptType === 'final' && message.role === 'user') {
+      // 📝 [핵심] Transcript(자막)가 오면 기록에 추가
+      if (message.type === 'transcript' && message.transcriptType === 'final') {
+          const entry = { role: message.role, content: message.transcript };
+          transcriptHistoryRef.current.push(entry);
+
+          // 유저 메시지인 경우 감정 분석
+          if (message.role === 'user') {
              analyzeEmotion(message.transcript);
           }
       }
+
       if (message.type === 'speech-update' && message.role === 'assistant' && message.status === 'started') {
           setCallStatus('speaking');
       }
@@ -76,112 +83,100 @@ export function useSpiritVapi(
       }
     };
 
-    const onError = (err: any) => {
-        console.error('🔴 Vapi Error:', err);
-        setCallStatus('idle');
-        releaseWakeLock();
-    };
-
-    // 리스너 부착
     vapi.on('call-start', onCallStart);
     vapi.on('call-end', onCallEndHandler);
     vapi.on('speech-start', onSpeechStart);
     vapi.on('speech-end', onSpeechEnd);
     vapi.on('message', onMessage);
-    vapi.on('error', onError);
 
     return () => { 
-        // 언마운트 시 리스너만 깔끔하게 제거 (인스턴스는 살려둠)
         vapi.off('call-start', onCallStart);
         vapi.off('call-end', onCallEndHandler);
         vapi.off('speech-start', onSpeechStart);
         vapi.off('speech-end', onSpeechEnd);
         vapi.off('message', onMessage);
-        vapi.off('error', onError);
         releaseWakeLock();
     };
   }, [onCallEnd, analyzeEmotion, requestWakeLock, releaseWakeLock]);
 
-  // 🛑 [핵심 2] 확실한 사살 (Force Stop)
   const stopVapi = useCallback(() => {
     console.log("🛑 Force Stopping Vapi...");
-    setCallStatus('idle'); // UI 즉시 반영
-    
-    try {
-        vapi.stop(); // SDK 강제 종료
-    } catch (e) {
-        console.warn("Stop failed (already stopped?)", e);
-    }
-    
+    setCallStatus('idle');
+    try { vapi.stop(); } catch (e) {}
     releaseWakeLock();
   }, [releaseWakeLock]);
 
-  // 📞 [핵심 3] 시작 전 청소 (Clean Start)
   const toggleCall = useCallback(async () => {
-    // 1. 통화 중이면 -> 확실히 끊기
     if (callStatus !== 'idle') {
         stopVapi();
         return;
     }
 
-    // 2. 통화 시작 로직
     const selectedMask = SOUL_MASKS.find(m => m.id === currentPersona);
     const assistantId = selectedMask?.assistantId;
 
     if (!assistantId) {
-        alert(`Assistant ID for ${currentPersona} not found.`);
+        alert(`Assistant ID not found for ${currentPersona}`);
         return;
     }
 
-    console.log(`🧹 Cleaning up before start...`);
     setCallStatus('connecting');
-    
-    try {
-        // (A) 시작 전에 무조건 한 번 끊어줍니다. (좀비 세션 방지)
-        try { vapi.stop(); } catch (e) {}
+    transcriptHistoryRef.current = []; // 시작 전 초기화
 
-        // (B) 200ms 대기: 브라우저가 오디오 장치를 뱉어낼 시간을 줍니다.
+    // Vapi 기본 옵션
+    const baseOptions = {
+        metadata: { userId: userId || 'guest' }
+    };
+
+    try {
+        try { vapi.stop(); } catch (e) {}
         await new Promise(resolve => setTimeout(resolve, 200));
 
-        // (C) 이제 깨끗한 상태에서 시작
-        console.log(`📞 Starting Call with Persona: ${currentPersona}`);
-        
-        // 메타데이터에 userId 심기 (서버에서 확인용)
-        await vapi.start(assistantId, {
-            metadata: { userId: userId || 'guest' }
-        });
+        // 1차 시도: Voice Override
+        if (preferredVoiceId) {
+            console.log(`🎤 Try 1: Starting with Voice Override (${preferredVoiceId})...`);
+            await vapi.start(assistantId, {
+                ...baseOptions, // metadata 포함
+                voice: {
+                    provider: '11labs',
+                    voiceId: preferredVoiceId,
+                }
+            });
+        } else {
+            console.log("🎤 Starting with Default Voice...");
+            await vapi.start(assistantId, baseOptions);
+        }
 
-    } catch (e) {
-        console.error("❌ Vapi Start Failed:", e);
-        setCallStatus('idle');
-        // 실패 시에도 한 번 더 확실히 죽임
-        try { vapi.stop(); } catch(e) {}
-        alert("통화 연결에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } catch (e: any) {
+        console.warn("⚠️ 1차 연결 실패, 기본값으로 재시도:", e);
+        if (preferredVoiceId) {
+            try {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await vapi.start(assistantId, baseOptions);
+            } catch (retryError) {
+                setCallStatus('idle');
+                alert("통화 연결에 실패했습니다.");
+            }
+        } else {
+            setCallStatus('idle');
+        }
     }
 
-  }, [callStatus, currentPersona, userId, stopVapi]);
+  }, [callStatus, currentPersona, userId, stopVapi, preferredVoiceId]);
 
-  // [New] 페르소나 변경 (의식)
   const changePersona = useCallback(async (personaId: PersonaType) => {
     const selectedMask = SOUL_MASKS.find(m => m.id === personaId);
     if (!selectedMask) return;
-
-    console.log(`[Ritual] Persona Changing to ${selectedMask.name}...`);
-
-    // 변경 시에는 무조건 통화를 끊습니다. (자연스러운 UX)
     if (callStatus !== 'idle') {
         stopVapi();
-        // 0.5초 뒤에 페르소나만 변경해둠 (사용자가 다시 터치해서 시작하도록 유도)
         setTimeout(() => setCurrentPersona(personaId), 500);
     } else {
         setCurrentPersona(personaId);
     }
-    
   }, [callStatus, stopVapi]);
 
-  // 텍스트 메시지 전송 (Whisper)
   const sendTextMessage = useCallback((text: string) => {
-      if (callStatus === 'active' || callStatus === 'listening' || callStatus === 'speaking') {
+      if (callStatus === 'active') {
           vapi.send({ type: 'add-message', message: { role: 'user', content: text } });
           analyzeEmotion(text); 
       }
@@ -190,15 +185,16 @@ export function useSpiritVapi(
   return { 
       vapiRef, 
       callStatus, 
-      toggleCall,
+      toggleCall, 
       stopVapi, 
       spiritMessage, 
       setSpiritMessage, 
       isSilentMode, 
       setIsSilentMode, 
-      sendTextMessage,
+      sendTextMessage, 
       setCurrentPersona,
       currentPersona,
       changePersona,
+      setVoiceId: setPreferredVoiceId 
   };
 }
