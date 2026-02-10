@@ -85,7 +85,7 @@ export const LivingSpirit = ({
                     className="absolute inset-8 rounded-full blur-[15px] mix-blend-overlay"
                     style={{ backgroundColor: style.core }}
                 />
-            </motion.div>
+                </motion.div>
 
             {/* Form Projection */}
             <div className="absolute inset-0 flex items-center justify-center opacity-40 mix-blend-soft-light">

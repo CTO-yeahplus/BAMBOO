@@ -12,3 +12,4 @@ export { SpiritCapsuleModal } from './SpiritCapsuleModal';
 export * from './MailboxModal';
 export * from './JournalModal';
 export * from './PaymentModal'; // 👈 추가
+export * from './VoiceSelectorModal'; // 👈 추가

@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
-import { Book, X, Star, Share2, ShoppingBag, Disc, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Settings2, Volume2, Mic, LogIn, Flame, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, Keyboard, SendHorizontal, Palette, Mail, Moon, Bed, Square, PenTool, ImageIcon } from 'lucide-react';
+import { Book, X, Star, User, Share2, ShoppingBag, Disc, Loader2, Trash2, Headphones, Sparkles, Droplets, Wind, Settings2, Volume2, Mic, LogIn, Flame, LogOut, Hourglass, Send, Clock, LayoutGrid, MousePointerClick, Keyboard, SendHorizontal, Palette, Mail, Moon, Bed, Square, PenTool, ImageIcon } from 'lucide-react';
 import { MemoryGalleryModal, FullImageViewer } from './components/MemoryGalleryModal';
 import { useBambooEngine } from './hooks/useBambooEngine';
 import { useRipple } from './hooks/useRipple';
@@ -13,7 +13,7 @@ import { InstallPrompt } from './components/InstallPrompt';
 import { ForestGuide } from './components/ForestGuide';
 import { supabase } from './utils/supabase'; 
 import { IntroSequence } from './components/IntroSequence';
-import { MailboxModal, JournalModal } from './components/modals';
+import { MailboxModal, JournalModal,VoiceSelectorModal } from './components/modals';
 import { CelestialBody } from './components/visuals/CelestialBody';
 import { PaymentModal } from './components/modals';
 
@@ -92,8 +92,23 @@ export default function BambooForest() {
   // 👇 [New] 달력용 메모리 데이터 상태 추가
   const [calendarMemories, setCalendarMemories] = useState<any[]>([]);
 
+  // 👇 [New] Voice Selection States
+  const [isVoiceSelectorOpen, setIsVoiceSelectorOpen] = useState(false);
+  const [currentVoiceId, setCurrentVoiceId] = useState("cjVigAj5msChJcoj2");
+  
   // Intro Visibility State
   const [introVisible, setIntroVisible] = useState(true);
+
+  // Load Voice ID for Premium Users
+  useEffect(() => {
+    const fetchVoice = async () => {
+        if (user && isEffectivePremium) {
+            const { data } = await supabase.from('profiles').select('voice_id').eq('id', user.id).single();
+            if (data?.voice_id) setCurrentVoiceId(data.voice_id);
+        }
+    };
+    fetchVoice();
+  }, [user, isEffectivePremium]);
 
   const handleEnterForest = () => {
       engine.initAudio(); 
@@ -257,69 +272,62 @@ export default function BambooForest() {
         {/* 1. Intro Overlay */}
         <AnimatePresence>
             {engine.isMounted && introVisible && (
-                <motion.div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black cursor-pointer" onClick={handleEnterForest} exit={{ opacity: 0, transition: { duration: 1.5, ease: "easeInOut" } }}>
-                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1 }} className="flex flex-col items-center gap-8">
-                        <div className="p-6 rounded-full border border-white/10 bg-white/5 shadow-[0_0_40px_rgba(255,255,255,0.05)]"><Headphones size={48} className="text-white/80" strokeWidth={1} /></div>
-                        <div className="text-center space-y-4">
-                            <p className="text-white/60 text-xs tracking-[0.3em] uppercase font-light">Headphones Recommended</p>
-                            <motion.p className="text-white/30 text-[10px] tracking-[0.4em] uppercase" animate={{ opacity: [0.3, 0.8, 0.3] }} transition={{ duration: 2, repeat: Infinity }}>Touch to Enter</motion.p>
+                <motion.div 
+                    className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                >
+                    {/* Top Navigation Bar */}
+                    <div className="absolute top-0 w-full p-6 flex justify-between items-center z-20">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 text-white/30">
+                            <Wind size={16} />
+                            <span className="text-xs tracking-[0.3em] font-serif">SOUL FOREST</span>
+                        </motion.div>
+                        <div className="flex items-center gap-4">
+                            {/* ✨ Voice Selector (Premium Only) */}
+                            {isEffectivePremium && (
+                                <motion.button 
+                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                    onClick={() => setIsVoiceSelectorOpen(true)}
+                                    className="text-white/40 hover:text-amber-300 transition-colors"
+                                >
+                                    <Sparkles size={18} />
+                                </motion.button>
+                            )}
+                            <motion.button onClick={() => setShowProfile(true)} className="text-white/50 hover:text-white transition-all">
+                                <User size={18} />
+                            </motion.button>
                         </div>
+                    </div>
+
+                    {/* Glowing Touch Button */}
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }} 
+                        animate={{ opacity: 1, scale: 1 }} 
+                        transition={{ duration: 1 }}
+                        className="flex flex-col items-center gap-8 cursor-pointer"
+                        onClick={handleEnterForest}
+                    >
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-emerald-500/10 rounded-full blur-[40px] animate-pulse group-hover:bg-emerald-500/20 transition-all duration-1000" />
+                            <button className="relative w-24 h-24 rounded-full bg-gradient-to-b from-white/5 to-transparent border border-white/10 flex items-center justify-center backdrop-blur-sm shadow-[0_0_30px_rgba(255,255,255,0.05)] group-hover:scale-105 transition-transform duration-700">
+                                <Mic className="w-8 h-8 text-white/60 group-hover:text-white transition-colors duration-500" />
+                            </button>
+                        </div>
+                        <p className="text-white/30 text-xs font-light tracking-[0.3em] uppercase animate-pulse">
+                            Touch to Whisper
+                        </p>
                     </motion.div>
                 </motion.div>
             )}
         </AnimatePresence>
 
-        {/* 2. Background Layers Group (배경 요소 그룹화 및 블러 처리) */}
-        <motion.div 
-            className="absolute inset-0 w-full h-full"
-            initial={false}
-            animate={{ 
-                filter: isFocusMode ? "blur(8px) brightness(0.6)" : "blur(0px) brightness(1)",
-                scale: isFocusMode ? 1.05 : 1 // 살짝 줌인되는 효과 추가 (Depth 강화)
-            }}
-            transition={cinematicTransition}
-        >
-            {/* 기존 배경 레이어들 (907라인 ~ 914라인)을 이 안으로 포함 */}
-            <motion.div className="absolute inset-0 z-10 pointer-events-none bg-gradient-to-t from-black/80 via-gray-900/50 to-transparent mix-blend-hard-light" animate={{ opacity: hasWoken ? 0 : 1 }} transition={{ duration: 3 }} />
-            
-            <motion.div className="absolute inset-[-5%] w-[110%] h-[110%]" style={{ x: bgX, y: bgY }}>
-                <motion.div className={`absolute inset-0 bg-gradient-to-b ${engine.backgroundGradient.join(' ')}`} animate={{ opacity: callStatus === 'idle' && !engine.showJournal ? 0.7 : engine.showJournal ? 0.2 : 1 }} transition={{ duration: 2.5 }} />
-            </motion.div>
-            
-            {engine.sleepTimer !== null && ( <motion.div initial={{ opacity: 0 }} animate={{ opacity: 0.85 }} exit={{ opacity: 0 }} transition={{ duration: 3 }} className="absolute inset-0 z-20 bg-black pointer-events-none" /> )}
-
-            {/* ☀️ Celestial Body (Sun/Moon) */}
-            <CelestialBody 
-                isDaytime={engine.isDaytime} 
-                moonPath={moonPath}
-                mouseX={mouseX} // 👈 전달
-                mouseY={mouseY} // 👈 전달
-            />
-            
-            <FireflyLayer fireflies={fireflies} />
-
-            {/* Floating Bottle Layer */}
-            {hasWoken && !engine.showJournal && (
-                <FloatingBottle onClick={() => { engine.playPaperRustle(); findRandomBottle(); }} />
-            )}
-
-            <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden"><AnimatePresence>{ripples.map((ripple) => (<motion.div key={ripple.id} initial={{ scale: 0, opacity: 0.5 }} animate={{ scale: 4, opacity: 0 }} exit={{ opacity: 0 }} transition={{ duration: 1 }} className="absolute border border-white/30 rounded-full bg-white/5 backdrop-blur-[1px]" style={{ left: ripple.x, top: ripple.y, width: 100, height: 100, x: "-50%", y: "-50%" }} />))}</AnimatePresence></div>
-
-            <motion.div className="absolute inset-[-5%] w-[110%] h-[110%] pointer-events-none" style={{ x: particleX, y: particleY }}>
-                {!engine.showJournal && engine.isMounted && particles.length > 0 && particles.slice(0, 20).map((p) => {
-                    if (engine.weather === 'rain') { return <motion.div key={`rain-${p.id}`} className="absolute pointer-events-none" style={{ left: `${p.x}%`, top: `${p.y}%`, width: 1, height: p.size * 4, opacity: 0.6, backgroundColor: SOUL_LEVELS[engine.soulLevel].color }} animate={{ y: ['-10vh', '110vh'] }} transition={{ duration: p.duration, repeat: Infinity, ease: "linear" }} />; }
-                    if (engine.season === 'spring') { return <motion.div key={`spring-${p.id}`} className="absolute pointer-events-none" style={{ left: `${p.x}%`, top: `${p.y}%`, width: p.size * 2, height: p.size * 2 }} animate={{ y: ['-10vh', '110vh'], rotate: [0, 360] }} transition={{ duration: p.duration + 2, repeat: Infinity, ease: "linear" }}><SpringPetal color="pink" /></motion.div>; }
-                    return <motion.div key={p.id} className="absolute pointer-events-none bg-white/50 w-1 h-1 rounded-full" style={{ left: `${p.x}%`, top: `${p.y}%` }} animate={{ y: ['-10vh', '110vh'] }} transition={{ duration: p.duration, repeat: Infinity, ease: "linear" }} />;
-                })}
-            </motion.div>
-        </motion.div>
 
         {/* 👇 [New] 3. Cinematic Vignette Layer (시네마틱 비네팅) */}
         {/* 정령 뒤쪽, 배경 앞쪽에 위치하여 가장자리를 어둡게 만듦 */}
         <motion.div 
             className="absolute inset-0 pointer-events-none z-20 bg-[radial-gradient(circle_at_center,transparent_0%,black_120%)]"
             animate={{ 
-                opacity: isFocusMode ? 0.8 : 0, // 대화 중에만 어두워짐
+                opacity: isFocusMode ? 2.0 : 0.2, // 대화 중에만 어두워짐
             }}
             transition={cinematicTransition}
         />
@@ -329,23 +337,6 @@ export default function BambooForest() {
               className={`absolute inset-0 flex items-center justify-center ${!hasWoken ? 'cursor-pointer z-30' : 'z-30'}`} 
               style={{ x: spiritX, y: spiritY }}
           >
-              <motion.div animate={{ filter: isFocusMode ? "blur(4px)" : "blur(0px)" }} transition={cinematicTransition}>
-                <SoulTree resonance={engine.resonance} memories={engine.memories} />
-             </motion.div>
-             {/* 👇 [여기에 추가] 장착된 아티팩트 (기억의 등불) 렌더링 */}
-            {engine.equippedItems.artifacts?.includes('artifact_lantern') && (
-                <MemoryLantern 
-                    onClick={() => {
-                        const randomMemory = engine.memories[Math.floor(Math.random() * engine.memories.length)];
-                        if (randomMemory) {
-                            // 여기에 토스트 메시지나 음성 안내를 넣으면 더 좋습니다.
-                            alert(`💡 기억의 등불이 속삭입니다:\n"${randomMemory.summary}"`);
-                        } else {
-                            alert("아직 등불에 담을 기억이 없습니다.");
-                        }
-                    }} 
-                />
-            )}
               
               {/* 👇 [NEW] Living Spirit Visualizer */}
               <motion.div 
@@ -560,6 +551,7 @@ export default function BambooForest() {
         )}
         </motion.div>
         </ForestBackground>
+        <VoiceSelectorModal isOpen={isVoiceSelectorOpen} onClose={() => setIsVoiceSelectorOpen(false)} userId={user?.id} currentVoiceId={currentVoiceId} onSelect={(id) => setCurrentVoiceId(id)} />
 
         {/* 👇 [New] 불타는 의식 시각 효과 (Fire Overlay) */}
         <AnimatePresence>
@@ -718,7 +710,7 @@ export default function BambooForest() {
             applyPreset={engine.applyPreset}
             currentTheme={engine.currentTheme}
             setTheme={engine.setTheme}
-            isPremium={isPremium}
+            isPremium={isEffectivePremium}
             binauralMode={engine.binauralMode}
             setBinauralMode={engine.setBinauralMode}
             pushPermission={engine.pushPermission}
@@ -737,7 +729,8 @@ export default function BambooForest() {
         
         <ProfileModal 
             isOpen={showProfile} onClose={() => setShowProfile(false)} 
-            user={user} isPremium={isPremium} signOut={engine.signOut} getUserInitial={getUserInitial} 
+            user={user} signOut={engine.signOut} getUserInitial={getUserInitial} 
+            isPremium={isEffectivePremium}
         />
 
         {/* Whisper(Bottle) Modal: 이제 이거 하나면 됩니다! */}

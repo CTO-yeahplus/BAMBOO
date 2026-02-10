@@ -23,7 +23,7 @@ export const IntroSequence = ({ onComplete }: { onComplete: () => void }) => {
             className="fixed inset-0 z-[9999] flex items-center justify-center bg-black pointer-events-none"
             initial={{ opacity: 1 }}
             animate={step === 2 ? { opacity: 0 } : { opacity: 1 }}
-            transition={{ duration: 1.5, ease: "easeInOut" }}
+            transition={{ duration: 5.5, ease: "easeInOut" }}
         >
             <AnimatePresence>
                 {step === 1 && (
@@ -35,10 +35,10 @@ export const IntroSequence = ({ onComplete }: { onComplete: () => void }) => {
                         className="text-center"
                     >
                         <h1 className="text-4xl md:text-6xl font-serif text-white/90 tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
-                            SOUL FOREST
+                            BAMBOO FOREST
                         </h1>
                         <p className="mt-4 text-sm md:text-base text-white/40 font-light tracking-[0.3em] uppercase">
-                            Listen to your inner voice
+                            이 숲에서의 대화는 오직 당신과 저와의 비밀입니다
                         </p>
                     </motion.div>
                 )}
