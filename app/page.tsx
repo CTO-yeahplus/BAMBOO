@@ -7,7 +7,7 @@ import { Book, X, Star, User, Share2, ShoppingBag, Disc, Loader2, Trash2, Headph
 import { MemoryGalleryModal, FullImageViewer } from './components/MemoryGalleryModal';
 import { useBambooEngine } from './hooks/useBambooEngine';
 import { useRipple } from './hooks/useRipple';
-import { Memory, WeatherType, Particle, THEMES } from './types';
+import { Memory, WeatherType, Particle, THEMES, UserTier } from './types';
 import { getMoonPhase, getMoonIconPath } from './utils/moonPhase';
 import { InstallPrompt } from './components/InstallPrompt';
 import { ForestGuide } from './components/ForestGuide';
@@ -41,11 +41,11 @@ export default function BambooForest() {
   const [demoPremium, setDemoPremium] = useState(false);
   
   const { 
-    user, memories, 
+    user, memories, tier: userTier, dbCredits,
     bgVolume, voiceVolume, 
     motionValues, hasWoken, callStatus, isSilentMode,
     fireflies, broadcastTouch,
-    resonance, isPremium: dbPremium, 
+    resonance, 
     // Bottle functions
     sendBottle, findRandomBottle, likeBottle, foundBottle, setFoundBottle, replyToBottle,
     showFireRitual, setShowFireRitual, performFireRitual, saveVoiceCapsule,
@@ -53,26 +53,27 @@ export default function BambooForest() {
   } = engine;
 
   // 3. [Logic] 실제 유료 여부 판단 (DB 정보 OR 결제 직후 데모 상태)
-  const isEffectivePremium = true; //dbPremium || demoPremium;
-
+  const isEffectivePremium = userTier === 'premium' || userTier === 'standard' || demoPremium;
+  
   const currentThemeConfig = THEMES.find(t => t.id === engine.currentTheme) || THEMES[0];
   const { ripples, addRipple } = useRipple();
   // 1. 유료 회원 상태 & 상점 모달 상태
-  const [isPremium, setIsPremium] = useState(false); 
+  //const [isPremium, setIsPremium] = useState(false); 
 
   // 2. Vapi 연결 상태 정의 (engine.callStatus 활용)
   const isVapiConnected = engine.callStatus !== 'idle';
 
   // 3. 사용량 훅 연결 (Snippet 적용)
-  const { progress, isLimitReached, credits, refillEnergy } = useVapiLimit(
+  const { progress, isLimitReached, credits: hookCredits, refillEnergy } = useVapiLimit(
     isEffectivePremium, 
     isVapiConnected,
     () => {
-        // 🛑 시간 초과 시 실행될 콜백
-        if (stopVapi) stopVapi(); // 함수 존재 여부 체크 후 실행
+        // 콜백 함수 (코인 소진 시)
+        if (engine.stopVapi) engine.stopVapi();
         alert("모든 정령 코인을 소진했습니다. 다음 달에 충전됩니다.");
-        setShowShop(true); // 상점 자동 열기
-    }
+        setShowShop(true);
+    },
+    dbCredits // 👈 [New] 여기에 DB 값을 꼭 넣어주세요!
   );
   
   // Local UI States
@@ -128,7 +129,7 @@ export default function BambooForest() {
   };
   const handleSpiritClick = () => { if (!hasWoken) engine.wakeSpirit(); };
   const getUserInitial = () => { if (user?.email) return user.email[0].toUpperCase(); return "U"; };
-  const avatarBorderClass = isPremium ? "border-yellow-400/50 shadow-[0_0_15px_rgba(253,224,71,0.3)]" : "border-white/20";
+  const avatarBorderClass = userTier==='premium' ? "border-yellow-400/50 shadow-[0_0_15px_rgba(253,224,71,0.3)]" : "border-white/20";
 
   // Motion Transforms
   const moonPhase = useMemo(() => getMoonPhase(new Date()), []);
@@ -388,7 +389,11 @@ export default function BambooForest() {
                 <motion.div key="active-status" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-6 pointer-events-auto">
                     <div className="flex items-center gap-6">
                         <button onClick={engine.toggleSilentMode} className={`p-4 rounded-full border transition-all duration-300 ${isSilentMode ? 'bg-white/20 border-white/40 text-white' : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'}`}><Keyboard size={20} /></button>
-                        <button onClick={engine.toggleCall} className="group relative z-50 p-6 rounded-full bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-500/40 transition-all duration-300 cursor-pointer active:scale-90"><span className="sr-only">End Call</span><motion.div animate={{ rotate: engine.callStatus === 'connecting' ? 0 : 90 }}><X size={24} className="text-white/80 group-hover:text-red-200" /></motion.div></button>
+                        <button onClick={() => {
+                                console.log("User clicked End Call"); // 디버깅용
+                                engine.toggleCall();
+                            }}
+                         className="group relative z-50 p-6 rounded-full bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-500/40 transition-all duration-300 cursor-pointer active:scale-90"><span className="sr-only">End Call</span><motion.div animate={{ rotate: engine.callStatus === 'connecting' ? 0 : 90 }}><X size={24} className="text-white/80 group-hover:text-red-200" /></motion.div></button>
                     </div>
                     <div className="flex flex-col items-center gap-2"><motion.span className="text-[10px] font-medium text-green-400/60 tracking-[0.4em] uppercase" animate={engine.callStatus === 'processing' ? { opacity: [1, 0.5, 1] } : { opacity: 1 }} transition={{ duration: 1.5, repeat: Infinity }}>{engine.getStatusText()}</motion.span></div>
                 </motion.div>
@@ -407,8 +412,9 @@ export default function BambooForest() {
 
                 {/* Right Bottom: Magic Satchel (Unified Menu) */}
                 <MagicSatchel 
-                  isPremium={isEffectivePremium}
-                  credits={credits}
+                  //isPremium={tier === 'premium' || tier === 'standard'}
+                  userTier={userTier || 'free'}
+                  credits={dbCredits}
                   progress={progress}
                   hasUnreadMail={engine.letters.length > 0}
                   onOpenSettings={() => engine.setShowSettings(true)}
@@ -513,11 +519,13 @@ export default function BambooForest() {
         </motion.div>
         </ForestBackground>
         
-        <VoiceSelectorModal 
+        <VoiceSelectorModal
             isOpen={isVoiceSelectorOpen} 
             onClose={() => setIsVoiceSelectorOpen(false)} 
             userId={user?.id} 
-            currentVoiceId={currentVoiceId} 
+            userTier={userTier}
+            currentVoiceId={currentVoiceId}
+            onOpenShop={() => setShowShop(true)} 
             onSelect={(id) => {
                 // 1. UI 반영
                 setCurrentVoiceId(id);
@@ -604,11 +612,13 @@ export default function BambooForest() {
             onDrawCard={engine.drawOracleCard} 
             todaysCard={engine.todaysCard}
             isLoading={engine.isOracleLoading}
-        />        
+        />
+                
         <SettingsModal 
             isOpen={engine.showSettings} 
             onClose={() => engine.setShowSettings(false)}
             user={user}
+            userTier={userTier}
             // 👇 [Fix] 볼륨 3형제를 모두 전달해야 믹서가 작동합니다!
             volume={engine.volume}
             setVolume={engine.setVolume}
@@ -639,6 +649,7 @@ export default function BambooForest() {
             requestPushPermission={engine.requestPushPermission}
             showOnboarding={engine.showOnboarding}
             handleOnboardingComplete={engine.handleOnboardingComplete}
+            onOpenShop={() => setShowShop(true)}
         />
         
         <AltarModal 
@@ -649,10 +660,10 @@ export default function BambooForest() {
             spiritForm={spiritForm} changeSpiritForm={changeSpiritForm}
         />
         
-        <ProfileModal 
+        <ProfileModal
             isOpen={showProfile} onClose={() => setShowProfile(false)} 
             user={user} signOut={engine.signOut} getUserInitial={getUserInitial} 
-            isPremium={isEffectivePremium}
+            tier={userTier} onOpenShop={() => setShowShop(true)}
         />
 
         {/* Whisper(Bottle) Modal: 이제 이거 하나면 됩니다! */}
@@ -701,11 +712,12 @@ export default function BambooForest() {
         />
 
         {/* 💰 PaymentModal: userId 제거, userName/isPremium 전달 */}
-        <PaymentModal 
+        <PaymentModal
                 isOpen={showShop} 
                 onClose={() => setShowShop(false)} 
-                userName={user?.email} 
-                isPremium={isEffectivePremium}
+                userName={user?.email}
+                userTier={userTier} 
+                //isPremium={isEffectivePremium}
                 onSuccess={(type, amount) => {
                     // 결제 성공 시 로직 (필요하면 리로드나 알림 추가)
                     setShowShop(false);

@@ -24,9 +24,9 @@ export function useBambooEngine() {
 // 1. [Fix] 사운드 믹서 상태 변수 직접 선언 (useSoundEngine 대신 사용)
 // -----------------------------------------------------------
   const [volume, setVolume] = useState(1);           // 마스터 볼륨 (0~1)
-  const { user, isPremium, signInWithGoogle, signOut } = useAuth();
+  const { user, tier, credits: dbCredits, signInWithGoogle, signOut } = useAuth();
   const { triggerSuccess, triggerMedium, triggerLight, triggerBreathing } = useHaptic();  
-  const soul = useSoulData(user, triggerSuccess, isPremium);
+  const soul = useSoulData(user, triggerSuccess, tier);
   const [showFireRitual, setShowFireRitual] = useState(false);
   const [weather, setWeather] = useState<WeatherType>('clear');
   const [selectedAmbience, setSelectedAmbience] = useState<WeatherType | null>(null);
@@ -119,7 +119,12 @@ export function useBambooEngine() {
     }, 1500);
   };
 
-  const voice = useSpiritVapi(user?.id ?? null, handleCallEnd, handleEmotionDetected);
+  const voice = useSpiritVapi(
+    user?.id ?? null, 
+    tier || 'free', // tier 전달 (없으면 free)
+    handleCallEnd, 
+    handleEmotionDetected
+);
   
   const [currentTheme, setCurrentTheme] = useState<ThemeId>('bamboo');
   //const audioRefs = useRef<{ [key in WeatherType]: HTMLAudioElement | null }>({ clear: null, rain: null, snow: null, ember: null });
@@ -559,10 +564,11 @@ export function useBambooEngine() {
   return {
     // 1. User & Auth
     user, 
-    isPremium, 
     signInWithGoogle, 
     signOut, 
     isMounted: true, 
+    tier,
+    dbCredits,
     
     // 2. Mobile Experience
     hasStarted, 

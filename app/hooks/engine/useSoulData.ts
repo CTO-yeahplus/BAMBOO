@@ -13,7 +13,7 @@ export interface SoulLetter {
     created_at: string;
 }
 
-export function useSoulData(user: any, triggerSuccess: () => void, isPremium: boolean) {
+export function useSoulData(user: any, triggerSuccess: () => void, tier: string) {
   // --- [State Definition] ---
   const [resonance, setResonance] = useState(0);
   const [totalResonance, setTotalResonance] = useState(0); 
@@ -115,17 +115,28 @@ export function useSoulData(user: any, triggerSuccess: () => void, isPremium: bo
 
   // 🌟 [New] 기억 생성 (Create)
   const createMemory = async (content: string, summary?: string, emotion: string = 'neutral') => {
-      if (!user) return;
+      if (!user) {
+        console.error("❌ createMemory failed: No user logged in.");
+      return;
+      }
       try {
+        console.log("💾 Creating Memory...", { content_len: content.length, emotion });
           const { error } = await supabase.from('memories').insert({
               user_id: user.id,
               content: content,
               summary: summary || content.slice(0, 50),
               emotion: emotion,
-              is_capsule: false
+              is_capsule: false,
+              created_at: new Date().toISOString()
           });
           
-          if (error) throw error;
+        if (error) {
+            // 🌟 [핵심] 에러 내용을 구체적으로 출력
+            console.error("🔥 Supabase Insert Error:", error.message, error.details);
+            throw error;
+        }
+
+        
           
           console.log("✅ Memory Created");
           fetchMemories(); // 목록 갱신
@@ -277,7 +288,7 @@ export function useSoulData(user: any, triggerSuccess: () => void, isPremium: bo
         .is('reply_audio_url', null)
         .limit(10);
 
-    if (isPremium) {
+    if (tier==='premium') {
         query = query.order('is_distress', { ascending: false });
     }
     

@@ -1,15 +1,21 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 // 💎 정책 설정
 const COIN_COST_PER_SEC = 1 / 60; // 1초당 1/60 코인 소모 (1분 = 1코인)
 const ALLOWANCE = {
     FREE: 5,   // 무료: 월 5코인 (약 5분)
-    PRO: 60,   // 유료: 월 60코인 (약 60분)
+    PRO: 90,   // 유료: 월 90코인 (약 90분)
 };
 
-export const useVapiLimit = (isPremium: boolean, isConnected: boolean, disconnectVapi: () => void) => {
-    const [credits, setCredits] = useState<number>(0); // 현재 보유 코인
+export const useVapiLimit = (
+    isPremium: boolean, 
+    isConnected: boolean, 
+    disconnectVapi: () => void,
+    dbCredits: number = 0 // 👈 [New] DB에서 가져온 실제 크레딧 (필수)
+) => {
+    // 내부 상태: DB값으로 초기화, 없으면 0
+    const [credits, setCredits] = useState<number>(dbCredits); 
     const [isLimitReached, setIsLimitReached] = useState(false);
     
     // 이번 달 최대 한도 (UI 표시용)
@@ -18,81 +24,64 @@ export const useVapiLimit = (isPremium: boolean, isConnected: boolean, disconnec
     // 에너지 잔량 (0 ~ 100%)
     const progress = Math.min(100, Math.max(0, (credits / maxCredits) * 100));
 
-    // 1. 초기화 및 월간 지급 로직
+    // 🔄 1. DB 데이터 동기화 (Source of Truth)
+    // 통화 중이 아닐 때만 DB 값을 내부 상태로 가져옵니다.
+    // (통화 중일 때는 실시간 차감을 위해 내부 상태를 우선함)
     useEffect(() => {
-        const today = new Date();
-        const currentMonthKey = `${today.getFullYear()}-${today.getMonth()}`; // 예: 2024-5
-        
-        const savedMonth = localStorage.getItem('vapi_month_key');
-        const savedCredits = parseFloat(localStorage.getItem('vapi_credits') || '0');
-        const userTier = localStorage.getItem('vapi_tier') || 'FREE';
-
-        // (A) 달이 바뀌었거나, 데이터가 없으면 -> 코인 지급 (리셋)
-        if (savedMonth !== currentMonthKey) {
-            const grant = isPremium ? ALLOWANCE.PRO : ALLOWANCE.FREE;
-            setCredits(grant);
-            localStorage.setItem('vapi_month_key', currentMonthKey);
-            localStorage.setItem('vapi_credits', grant.toString());
-            localStorage.setItem('vapi_tier', isPremium ? 'PRO' : 'FREE');
-        } 
-        // (B) 달은 같은데 티어가 '무료 -> 유료'로 올랐다면 -> 차액 지급 (보너스)
-        else if (userTier === 'FREE' && isPremium) {
-            const bonus = ALLOWANCE.PRO - ALLOWANCE.FREE;
-            const newBalance = savedCredits + bonus;
-            setCredits(newBalance);
-            localStorage.setItem('vapi_credits', newBalance.toString());
-            localStorage.setItem('vapi_tier', 'PRO');
-            alert(`🎉 Moonlight Pass 활성화! ${bonus} 코인이 추가 지급되었습니다.`);
+        if (!isConnected) {
+            // DB 값이 유효하고, 내부 값과 다를 때 업데이트
+            setCredits(dbCredits);
+            setIsLimitReached(dbCredits <= 0);
         }
-        // (C) 그 외: 저장된 잔액 불러오기
-        else {
-            setCredits(savedCredits);
-        }
-    }, [isPremium]);
+    }, [dbCredits, isConnected]);
 
-    // 2. 실시간 차감 로직
+
+    // ⏱️ 2. 실시간 차감 로직 (타이머)
     useEffect(() => {
         let interval: NodeJS.Timeout;
 
-        if (isConnected && credits > 0) {
+        if (isConnected) {
+            // 안전장치: 크레딧이 0 이하면 즉시 종료하지 않고, 
+            // 1초 뒤에 다시 확인 (DB 로딩 지연 가능성 대비)
+            if (credits <= 0) {
+                 // 아주 짧은 유예 시간을 둠 (0.5초 미만 컷 방지)
+            }
+
             interval = setInterval(() => {
                 setCredits((prev) => {
-                    const next = prev - COIN_COST_PER_SEC;
-                    
-                    // 코인 다 씀
-                    if (next <= 0) {
+                    // 이미 0 이하라면 종료 트리거
+                    if (prev <= 0) {
                         disconnectVapi();
                         setIsLimitReached(true);
                         return 0;
                     }
+                    
+                    const next = prev - COIN_COST_PER_SEC;
                     return next;
                 });
             }, 1000);
-        } else if (credits <= 0 && isConnected) {
-             // 이미 0인데 연결되어 있으면 끊기
-             disconnectVapi();
-             setIsLimitReached(true);
         }
 
         return () => clearInterval(interval);
-    }, [isConnected, credits, disconnectVapi]);
+    }, [isConnected, disconnectVapi, credits]);
 
-    // 3. 잔액 저장
+
+    // 💾 3. (옵션) 로컬 스토리지 백업
+    // DB 업데이트가 실패했을 때를 대비해 UI용으로만 저장
     useEffect(() => {
-        localStorage.setItem('vapi_credits', credits.toString());
+        if (credits > 0) {
+            localStorage.setItem('vapi_credits_backup', credits.toString());
+        }
     }, [credits]);
 
     return {
         credits,        // 남은 코인 (실수형)
         progress,       // 에너지 바 용도 (0~100)
         isLimitReached,
-        // 👇 [수정] 충전 함수: 원하는 양만큼 추가
+        
+        // 충전/관리자용 함수
         refillEnergy: (amount: number) => {
-            setCredits((prev) => {
-                const newCredits = prev + amount;
-                localStorage.setItem('vapi_credits', newCredits.toString());
-                return newCredits;
-            });
+            setCredits((prev) => prev + amount);
             setIsLimitReached(false);
         }
     };

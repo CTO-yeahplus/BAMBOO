@@ -1,7 +1,6 @@
-// app/hooks/engine/useSpiritVapi.ts
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Vapi from '@vapi-ai/web';
-import { CallStatus, WeatherType, SOUL_MASKS, PersonaType } from '../../types';
+import { CallStatus, WeatherType, SOUL_MASKS, PersonaType, UserTier } from '../../types';
 import { useWakeLock } from '../useWakeLock';
 
 // Vapi 인스턴스 (싱글톤)
@@ -19,22 +18,44 @@ const EMOTION_MAP: Record<string, WeatherType> = {
     '괜찮': 'clear', '사랑': 'clear'
 };
 
+// 🛠️ [Fix] 기본 음성 매핑 (Azure -> Deepgram 변경)
+// Azure 연결 오류 해결을 위해 안정적인 Deepgram으로 변경
+const BASIC_VOICE_CONFIG: Record<string, { provider: string, voiceId: string }> = {
+    'basic_male_01': { provider: 'deepgram', voiceId: 'orion' },
+    'basic_female_01': { provider: 'deepgram', voiceId: 'asteria' },
+};
+
 export function useSpiritVapi(
     userId: string | null, 
-    onCallEnd: (history: {role: string, content: string}[]) => void, // 👈 [수정] 대화 기록을 받도록 타입 변경
+    userTier: UserTier, 
+    onCallEnd: (history: {role: string, content: string}[]) => void,
     onEmotionDetected?: (weather: WeatherType) => void 
 ) {
   const [spiritMessage, setSpiritMessage] = useState<string | null>(null);
   const [isSilentMode, setIsSilentMode] = useState(false);
-  const vapiRef = useRef<any>(vapi);
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [currentPersona, setCurrentPersona] = useState<PersonaType>('spirit');
-  const { requestWakeLock, releaseWakeLock } = useWakeLock();
-  
   const [preferredVoiceId, setPreferredVoiceId] = useState<string | null>(null);
-
-  // 📝 [New] 대화 기록 저장소 (Ref로 관리하여 리렌더링 방지)
+  
+  const vapiRef = useRef<any>(vapi);
   const transcriptHistoryRef = useRef<{role: string, content: string}[]>([]);
+  const isConnectingRef = useRef(false);
+  
+  const { requestWakeLock, releaseWakeLock } = useWakeLock();
+
+  // 🔇 [New] 콘솔 노이즈 필터링 (setSinkId 에러 무시)
+  useEffect(() => {
+    const originalError = console.error;
+    console.error = (...args) => {
+        // SDK 내부의 setSinkId 오류는 기능상 문제없으므로 로그에서 숨김
+        if (typeof args[0] === 'string' && args[0].includes('setSinkId failed')) return;
+        if (args[0] && args[0].message && args[0].message.includes('setSinkId failed')) return;
+        originalError.apply(console, args);
+    };
+    return () => {
+        console.error = originalError;
+    };
+  }, []);
 
   const analyzeEmotion = useCallback((text: string) => {
       if (!onEmotionDetected) return;
@@ -48,15 +69,18 @@ export function useSpiritVapi(
 
   useEffect(() => {
     const onCallStart = () => {
+        console.log("📞 Call Started");
         setCallStatus('active');
+        isConnectingRef.current = false; 
         requestWakeLock();
-        transcriptHistoryRef.current = []; // 📝 통화 시작 시 기록 초기화
+        transcriptHistoryRef.current = []; 
     };
 
     const onCallEndHandler = () => { 
+        console.log("📞 Call Ended");
         setCallStatus('idle'); 
+        isConnectingRef.current = false; 
         releaseWakeLock();
-        // 📝 [핵심] 통화 종료 시, 모아둔 대화 기록을 상위로 전달
         onCallEnd(transcriptHistoryRef.current); 
     };
 
@@ -64,17 +88,11 @@ export function useSpiritVapi(
     const onSpeechEnd = () => setCallStatus('processing');
     
     const onMessage = (message: any) => {
-      // 📝 [핵심] Transcript(자막)가 오면 기록에 추가
       if (message.type === 'transcript' && message.transcriptType === 'final') {
           const entry = { role: message.role, content: message.transcript };
           transcriptHistoryRef.current.push(entry);
-
-          // 유저 메시지인 경우 감정 분석
-          if (message.role === 'user') {
-             analyzeEmotion(message.transcript);
-          }
+          if (message.role === 'user') analyzeEmotion(message.transcript);
       }
-
       if (message.type === 'speech-update' && message.role === 'assistant' && message.status === 'started') {
           setCallStatus('speaking');
       }
@@ -88,6 +106,16 @@ export function useSpiritVapi(
     vapi.on('speech-start', onSpeechStart);
     vapi.on('speech-end', onSpeechEnd);
     vapi.on('message', onMessage);
+    
+    vapi.on('error', (e: any) => {
+        // setSinkId 에러는 무시하고, 그 외 에러만 처리
+        const errMsg = e?.message || JSON.stringify(e);
+        if (errMsg.includes('setSinkId')) return;
+
+        console.error("Vapi Error:", e);
+        setCallStatus('idle');
+        isConnectingRef.current = false;
+    });
 
     return () => { 
         vapi.off('call-start', onCallStart);
@@ -95,6 +123,7 @@ export function useSpiritVapi(
         vapi.off('speech-start', onSpeechStart);
         vapi.off('speech-end', onSpeechEnd);
         vapi.off('message', onMessage);
+        vapi.off('error', () => {});
         releaseWakeLock();
     };
   }, [onCallEnd, analyzeEmotion, requestWakeLock, releaseWakeLock]);
@@ -102,11 +131,14 @@ export function useSpiritVapi(
   const stopVapi = useCallback(() => {
     console.log("🛑 Force Stopping Vapi...");
     setCallStatus('idle');
+    isConnectingRef.current = false;
     try { vapi.stop(); } catch (e) {}
     releaseWakeLock();
   }, [releaseWakeLock]);
 
   const toggleCall = useCallback(async () => {
+    if (isConnectingRef.current) return;
+
     if (callStatus !== 'idle') {
         stopVapi();
         return;
@@ -120,49 +152,62 @@ export function useSpiritVapi(
         return;
     }
 
+    isConnectingRef.current = true;
     setCallStatus('connecting');
-    transcriptHistoryRef.current = []; // 시작 전 초기화
+    transcriptHistoryRef.current = []; 
 
-    // Vapi 기본 옵션
-    const baseOptions = {
-        metadata: { userId: userId || 'guest' }
+    const isPremium = userTier === 'premium';
+    
+    const modelConfig = {
+        provider: 'openai',
+        model: isPremium ? 'gpt-4o' : 'gpt-4o-mini',
+        temperature: isPremium ? 0.7 : 0.5, 
+    };
+
+    let voiceConfig = {};
+    if (preferredVoiceId) {
+        if (BASIC_VOICE_CONFIG[preferredVoiceId]) {
+             const config = BASIC_VOICE_CONFIG[preferredVoiceId];
+             voiceConfig = { provider: config.provider, voiceId: config.voiceId };
+             console.log("☁️ Basic Voice Selected:", config.voiceId);
+        } else if (isPremium) {
+            voiceConfig = { provider: '11labs', voiceId: preferredVoiceId };
+            console.log("💎 Premium Voice Selected:", preferredVoiceId);
+        } else {
+             // Fallback (Deepgram Orion)
+             voiceConfig = { provider: 'deepgram', voiceId: 'orion' };
+        }
+    }
+
+    const vapiOptions = {
+        name: `Soul Forest Call (${userTier})`,
+        metadata: { userId: userId || 'guest', tier: userTier },
+        model: modelConfig,
+        voice: Object.keys(voiceConfig).length > 0 ? voiceConfig : undefined
     };
 
     try {
         try { vapi.stop(); } catch (e) {}
-        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 1초 대기
 
-        // 1차 시도: Voice Override
-        if (preferredVoiceId) {
-            console.log(`🎤 Try 1: Starting with Voice Override (${preferredVoiceId})...`);
-            await vapi.start(assistantId, {
-                ...baseOptions, // metadata 포함
-                voice: {
-                    provider: '11labs',
-                    voiceId: preferredVoiceId,
-                }
-            });
-        } else {
-            console.log("🎤 Starting with Default Voice...");
-            await vapi.start(assistantId, baseOptions);
-        }
+        console.log("🚀 Starting Vapi...");
+        await vapi.start(assistantId, vapiOptions);
 
     } catch (e: any) {
-        console.warn("⚠️ 1차 연결 실패, 기본값으로 재시도:", e);
-        if (preferredVoiceId) {
-            try {
-                await new Promise(resolve => setTimeout(resolve, 500));
-                await vapi.start(assistantId, baseOptions);
-            } catch (retryError) {
-                setCallStatus('idle');
-                alert("통화 연결에 실패했습니다.");
-            }
-        } else {
+        console.warn("⚠️ 연결 실패 (1차):", e);
+        try {
+            console.log("🔄 재시도 중...");
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            await vapi.start(assistantId, vapiOptions);
+        } catch (retryError) {
+            console.error("❌ 연결 최종 실패:", retryError);
             setCallStatus('idle');
+            isConnectingRef.current = false;
+            alert("연결에 실패했습니다.");
         }
     }
-
-  }, [callStatus, currentPersona, userId, stopVapi, preferredVoiceId]);
+  }, [callStatus, currentPersona, userId, stopVapi, preferredVoiceId, userTier]);
 
   const changePersona = useCallback(async (personaId: PersonaType) => {
     const selectedMask = SOUL_MASKS.find(m => m.id === personaId);
@@ -194,7 +239,7 @@ export function useSpiritVapi(
       sendTextMessage, 
       setCurrentPersona,
       currentPersona,
-      changePersona,
+      changePersona, 
       setVoiceId: setPreferredVoiceId 
   };
 }

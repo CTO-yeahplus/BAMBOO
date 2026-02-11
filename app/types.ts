@@ -319,3 +319,15 @@ export interface Soul {
   exp: number;
   // 필요한 경우 추가 필드
 }
+
+// 기존 UserProfile 인터페이스 수정
+export type UserTier = 'free' | 'standard' | 'premium';
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  subscription_tier: UserTier; // 👈 [New] 등급 필드
+  credits: number;
+  resonance: number;
+  created_at: string;
+}

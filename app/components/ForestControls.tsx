@@ -1,21 +1,24 @@
 'use client';
 
-import React, { useState, useEffect } from 'react'; // useEffect 추가
+import React, { useState, useEffect, useMemo } from 'react'; 
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     User, ShoppingBag, Book, Mail, Sparkles, X, Menu,
     Flame, Send, Image as ImageIcon, Calendar, Disc, Hourglass, Droplets,
     ChevronUp, Zap, Trees, CloudRain, Wind, Settings2
 } from 'lucide-react';
-import { WeatherType } from '../types';
+import { WeatherType, UserTier } from '../types';
 import { SpiritEnergy } from './ui/SpiritEnergy'; 
 
+const MAX_CREDITS_FREE = 5;
+const MAX_CREDITS_PAID = 90;
+
 interface ForestDockProps {
-    isPremium: boolean;
     hasCollectedDew?: boolean;
     hasUnreadMail?: boolean;
-    credits?: number; 
+    credits?: number;  
     progress?: number; 
+    userTier?: UserTier; 
 
     onOpenProfile: () => void;
     onOpenSettings: () => void;
@@ -33,82 +36,75 @@ interface ForestDockProps {
 }
 
 export const MagicSatchel = ({
-    isPremium, hasCollectedDew, hasUnreadMail, credits, progress = 0,
+    hasCollectedDew, hasUnreadMail, credits = 0, progress: externalProgress,
     onOpenProfile, onOpenSettings, onOpenShop, onOpenVoice,
-    onOpenJournal, onOpenMailbox, onOpenFire,
+    onOpenJournal, onOpenMailbox, onOpenFire, userTier = 'free', // 기본값 free
     onOpenBottle, onOpenGallery, onOpenCalendar,
     onOpenSpiritCapsules, onOpenCapsule, onCollectDew
 }: ForestDockProps) => {
     const [isOpen, setIsOpen] = useState(false);
+    
+    // 유효한 유료 회원 여부 판단
+    const isPaidUser = userTier === 'premium' || userTier === 'standard';
+    const isPremium = userTier === 'premium'; 
 
-    // 🕵️‍♂️ [디버깅] 데이터 추적 로그
+    // 🕵️‍♂️ [디버깅 로그] - Console 창을 확인하세요
     useEffect(() => {
-        console.log(`[ForestDock] Current Props:`, { 
-            isPremium, 
-            hasCollectedDew, 
-            credits 
+        console.log(`[MagicSatchel] Debug Info:`, {
+            userTier,           // 들어온 등급 값 (예: 'premium', 'free', undefined)
+            isPaidUser,         // 유료 여부 (true/false)
+            isPremium,          // 프리미엄 여부 (true/false)
+            credits
         });
-    }, [isPremium, hasCollectedDew, credits]);
+    }, [userTier, isPaidUser, isPremium, credits]);
 
-    // 1. 기본 메뉴 정의
-    const baseMenuItems: any[] = [
-        { id: 'profile', icon: User, label: 'Profile', onClick: onOpenProfile },
-        { id: 'settings', icon: Settings2, label: 'Settings', onClick: onOpenSettings },
-        { id: 'shop', icon: ShoppingBag, label: 'Spirit Shop', onClick: onOpenShop },
-        
-        // Limit (Index: 3)
-        { id: 'limit', icon: Zap, label: 'Memory Limit', onClick: onOpenShop },
+    const calculatedProgress = useMemo(() => {
+        if (typeof externalProgress === 'number') return externalProgress;
+        const maxCredits = isPaidUser ? MAX_CREDITS_PAID : MAX_CREDITS_FREE;
+        const percent = (credits / maxCredits) * 100;
+        return Math.min(100, Math.max(0, percent)); 
+    }, [credits, isPaidUser, externalProgress]);
 
-        { id: 'journal', icon: Book, label: 'Journal', onClick: onOpenJournal },
-        { id: 'calendar', icon: Calendar, label: 'Moods', onClick: onOpenCalendar },
-        { id: 'gallery', icon: ImageIcon, label: 'Gallery', onClick: onOpenGallery },
+    // 📋 메뉴 리스트 구성
+    const menuItems = useMemo(() => {
+        const items = [
+            { id: 'profile', icon: User, label: 'Profile', onClick: onOpenProfile },
+            { id: 'settings', icon: Settings2, label: 'Settings', onClick: onOpenSettings },
+            { id: 'shop', icon: ShoppingBag, label: 'Spirit Shop', onClick: onOpenShop },
+            { id: 'voice', icon: Sparkles, label: 'Voice Select', 
+                onClick: onOpenVoice || (() => console.warn("No Voice Handler")), special: true 
+            },
+            
+            { id: 'limit', icon: Zap, label: 'Energy', onClick: onOpenShop },
+            { id: 'journal', icon: Book, label: 'Journal', onClick: onOpenJournal },
 
-        { id: 'fire', icon: Flame, label: 'Ritual', onClick: onOpenFire, color: 'text-red-300' },
-        { id: 'bottle', icon: Send, label: 'Whisper', onClick: onOpenBottle, color: 'text-blue-300' },
-        { id: 'spirit', icon: Disc, label: 'Voices', onClick: onOpenSpiritCapsules, color: 'text-indigo-300' },
-    ];
+            // Mailbox
+            ...(isPaidUser ? [{ 
+                id: 'mailbox', icon: Mail, label: 'Mailbox', 
+                onClick: onOpenMailbox, badge: hasUnreadMail, special: true 
+            }] : []),
 
-    // 2. 프리미엄 메뉴 주입 (Push/Splice 방식 사용 - 디버깅 용이)
-    if (isPremium) {
-        // [Voice] Shop(2) 뒤, Limit(3) 앞 -> Index 3에 삽입
-        //console.log("[ForestDock] Adding Premium Item: Voice");
-        baseMenuItems.splice(3, 0, { 
-            id: 'voice', 
-            icon: Sparkles, 
-            label: 'Voice Select', 
-            onClick: onOpenVoice || (() => console.warn("No Voice Handler")), 
-            special: true 
-        });
+            { id: 'calendar', icon: Calendar, label: 'Moods', onClick: onOpenCalendar },
+            { id: 'gallery', icon: ImageIcon, label: 'Gallery', onClick: onOpenGallery },
+            { id: 'fire', icon: Flame, label: 'Ritual', onClick: onOpenFire, color: 'text-red-300' },
+            { id: 'bottle', icon: Send, label: 'Whisper', onClick: onOpenBottle, color: 'text-blue-300' },
+            { id: 'spirit', icon: Disc, label: 'Voices', onClick: onOpenSpiritCapsules, color: 'text-indigo-300' },
 
-        baseMenuItems.splice(6, 0, { 
-            id: 'mailbox', 
-            icon: Mail, 
-            label: 'Mailbox', 
-            onClick: onOpenMailbox, 
-            badge: hasUnreadMail,
-            special: true 
-        });
+            // Capsule
+            ...(isPaidUser ? [{ 
+                id: 'capsule', icon: Hourglass, label: 'Time Capsule', 
+                onClick: onOpenCapsule, special: true 
+            }] : []),
 
-        // [Capsule] 맨 뒤에 추가
-        //console.log("[ForestDock] Adding Premium Item: Capsule");
-        baseMenuItems.push({ 
-            id: 'capsule', 
-            icon: Hourglass, 
-            label: 'Time Capsule', 
-            onClick: onOpenCapsule, 
-            special: true 
-        });
-    } else {
-        console.log("[ForestDock] User is NOT Premium. Skipping premium items.");
-    }
+            ...(!hasCollectedDew ? [{ 
+                id: 'dew', icon: Droplets, label: 'Collect Dew', 
+                onClick: onCollectDew, color: 'text-cyan-300' 
+            }] : [])
+        ];
 
-    // 3. 이슬 수집 추가
-    if (!hasCollectedDew) {
-        baseMenuItems.push({ id: 'dew', icon: Droplets, label: 'Collect Dew', onClick: onCollectDew, color: 'text-cyan-300' });
-    }
-
-    // 최종 렌더링될 리스트 확인
-    // console.log("[ForestDock] Final Menu List:", baseMenuItems.map(i => i.id));
+        console.log("[MagicSatchel] Generated Menu Items:", items.map(i => i.id)); // 생성된 메뉴 ID 목록 출력
+        return items;
+    }, [isPaidUser, hasCollectedDew, hasUnreadMail, userTier]);
 
     return (
         <div className="absolute bottom-6 left-0 right-0 z-[60] flex justify-center items-end pointer-events-none">
@@ -128,14 +124,14 @@ export const MagicSatchel = ({
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -20 }}
                             >
-                                {baseMenuItems.map((item) => {
+                                {menuItems.map((item) => {
                                     if (item.id === 'limit') {
                                         return (
                                             <div key={item.id} className="shrink-0 mx-1">
                                                 <SpiritEnergy 
-                                                    progress={progress} 
-                                                    isPremium={isPremium} 
-                                                    credits={credits} 
+                                                    progress={calculatedProgress} 
+                                                    userTier={userTier} 
+                                                    credits={credits}             
                                                     onUpgradeClick={onOpenShop} 
                                                 />
                                             </div>
@@ -198,6 +194,7 @@ export const MagicSatchel = ({
 };
 
 export const MinimalAmbience = ({ currentAmbience, onChangeAmbience }: { currentAmbience: WeatherType, onChangeAmbience: (t: WeatherType) => void }) => {
+    // 기존 코드 유지
     const [isExpanded, setIsExpanded] = useState(false);
     const sounds = [
         { id: 'clear', icon: <Trees size={16} /> },

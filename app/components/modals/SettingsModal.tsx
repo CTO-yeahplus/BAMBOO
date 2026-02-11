@@ -8,17 +8,19 @@ import {
     Moon, Sun, Music, Headphones
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { THEMES } from '../../types';
+import { THEMES, UserTier } from '../../types';
 
 export const SettingsModal = ({ 
     isOpen, onClose, 
     bgVolume, setBgVolume, voiceVolume, setVoiceVolume, 
     isMixerMode, setIsMixerMode, mixerVolumes, setMixerVolumes, applyPreset, 
-    currentTheme, setTheme, isPremium, binauralMode, setBinauralMode,
-    pushPermission, requestPushPermission,
+    currentTheme, setTheme, binauralMode, setBinauralMode,
+    pushPermission, requestPushPermission, userTier, onOpenShop
 }: any) => {
 
     const [tab, setTab] = useState<'audio' | 'visual'>('audio');
+    const isPremium = userTier === 'premium'
+    const [showPremiumAlert, setShowPremiumAlert] = useState(false);
 
     if (!isOpen) return null;
 
@@ -34,14 +36,80 @@ export const SettingsModal = ({
         hidden: { opacity: 0 },
         visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
     };
+
     const itemVariants = {
         hidden: { opacity: 0, y: 10 },
         visible: { opacity: 1, y: 0 }
     };
 
+    // 🔒 잠금 클릭 핸들러
+    const handleLockedClick = () => {
+        setShowPremiumAlert(true);
+    };
+
+    // 🛍️ 상점 이동 핸들러
+    const handleGoToShop = () => {
+        setShowPremiumAlert(false); // 알림 닫고
+        onClose(); // 설정창 닫고 (선택 사항)
+        if (onOpenShop) onOpenShop(); // 상점 열기
+    };
+
     return (
         <ModalOverlay onClose={onClose} title="Sanctuary" subtitle="Tuning your senses">
-            <div className="px-1 py-2 flex flex-col h-full">
+            <div className="px-1 py-2 flex flex-col h-full relative">
+                {/* 🌟 [New] Apple Style Premium Alert Overlay */}
+                <AnimatePresence>
+                    {showPremiumAlert && (
+                        <motion.div 
+                            initial={{ opacity: 0 }} 
+                            animate={{ opacity: 1 }} 
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md rounded-3xl"
+                            onClick={(e) => e.stopPropagation()} // 배경 클릭 방지
+                        >
+                            <motion.div 
+                                initial={{ scale: 0.9, y: 10 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.9, y: 10 }}
+                                className="w-[85%] max-w-sm bg-[#1a1a20] border border-white/10 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center relative overflow-hidden"
+                            >
+                                {/* 배경 효과 */}
+                                <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-indigo-500/10 to-transparent pointer-events-none" />
+                                
+                                {/* 아이콘 */}
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mb-5 shadow-[0_0_20px_rgba(99,102,241,0.4)] z-10">
+                                    <Headphones size={20} className="text-white" />
+                                </div>
+
+                                {/* 🍎 Apple Style Copywriting */}
+                                <h3 className="text-xl font-bold text-white mb-2 font-serif tracking-wide z-10">
+                                    깊은 몰입. 완전한 휴식.
+                                </h3>
+                                <p className="text-sm text-white/60 leading-relaxed mb-8 z-10">
+                                    뇌파 테라피로 마음의 주파수를 맞춰보세요.<br/>
+                                    오직 <span className="text-indigo-300 font-medium">Premium 멤버쉽</span>에서만 허락된<br/>특별한 치유입니다.
+                                </p>
+
+                                {/* 액션 버튼 */}
+                                <div className="w-full space-y-3 z-10">
+                                    <button 
+                                        onClick={handleGoToShop}
+                                        className="w-full py-3.5 rounded-xl bg-white text-black text-sm font-bold tracking-wide hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg flex items-center justify-center gap-2"
+                                    >
+                                        <Sparkles size={14} className="text-indigo-600" />
+                                        경험하기
+                                    </button>
+                                    <button 
+                                        onClick={() => setShowPremiumAlert(false)}
+                                        className="w-full py-3 rounded-xl text-white/40 text-xs hover:text-white transition-colors"
+                                    >
+                                        나중에 하기
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
                 
                 {/* 1. Elegant Tab Switcher */}
                 <div className="flex bg-white/5 p-1 rounded-2xl mb-6 relative mx-4 border border-white/5">
@@ -176,30 +244,48 @@ export const SettingsModal = ({
                                         <h3 className="text-xs font-bold text-white/40 uppercase tracking-widest flex items-center gap-2">
                                             <Headphones size={12} /> Brainwave Therapy
                                         </h3>
-                                        {!isPremium && <span className="text-[9px] bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-1.5 py-0.5 rounded">PREMIUM</span>}
+                                        {isPremium && <span className="text-[9px] bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-1.5 py-0.5 rounded">PREMIUM</span>}
                                     </div>
                                     <div className="grid grid-cols-3 gap-2">
-                                        {[
-                                            { id: 'delta', label: 'Deep Sleep', desc: 'Delta 0.5Hz', icon: Moon },
-                                            { id: 'alpha', label: 'Flow State', desc: 'Alpha 10Hz', icon: Sun },
-                                            { id: 'theta', label: 'Meditation', desc: 'Theta 6Hz', icon: Zap }
-                                        ].map((beat) => (
+                                    {[
+                                        { id: 'delta', label: 'Deep Sleep', desc: 'Delta 0.5Hz', icon: Moon },
+                                        { id: 'alpha', label: 'Flow State', desc: 'Alpha 10Hz', icon: Sun },
+                                        { id: 'theta', label: 'Meditation', desc: 'Theta 6Hz', icon: Zap }
+                                    ].map((beat) => {
+                                        // 🔒 잠금 여부 확인 (Premium 유저가 아니면 잠금)
+                                        const isLocked = userTier !== 'premium';
+                                        const isActive = binauralMode === beat.id;
+
+                                        return (
                                             <button
                                                 key={beat.id}
-                                                onClick={() => isPremium && setBinauralMode(binauralMode === beat.id ? 'none' : beat.id)}
-                                                className={`relative p-3 rounded-2xl border text-left transition-all ${
-                                                    binauralMode === beat.id 
+                                                onClick={() => {
+                                                    if (isLocked) {
+                                                        handleLockedClick(); // 🔒 잠금 팝업 호출
+                                                    } else {
+                                                        setBinauralMode(isActive ? 'none' : beat.id);
+                                                    }
+                                                }}
+                                                className={`relative p-3 rounded-2xl border text-left transition-all duration-300 group ${
+                                                    isActive
                                                     ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.2)]' 
                                                     : 'bg-white/5 border-white/5 hover:bg-white/10'
-                                                } ${!isPremium ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                } ${isLocked ? 'opacity-70' : ''}`}
                                             >
-                                                <beat.icon size={16} className={`mb-2 ${binauralMode === beat.id ? 'text-indigo-300' : 'text-white/30'}`} />
-                                                <div className={`text-xs font-bold mb-0.5 ${binauralMode === beat.id ? 'text-white' : 'text-white/60'}`}>{beat.label}</div>
+                                                <beat.icon size={16} className={`mb-2 ${isActive ? 'text-indigo-300' : 'text-white/30'}`} />
+                                                <div className={`text-xs font-bold mb-0.5 ${isActive ? 'text-white' : 'text-white/60'}`}>{beat.label}</div>
                                                 <div className="text-[9px] text-white/30 font-mono">{beat.desc}</div>
-                                                {!isPremium && <Lock size={12} className="absolute top-3 right-3 text-white/20" />}
+                                                
+                                                {/* 🔒 잠금 아이콘 */}
+                                                {isLocked && (
+                                                    <div className="absolute top-3 right-3 text-white/20 group-hover:text-amber-400 group-hover:scale-110 transition-all">
+                                                        <Lock size={12} />
+                                                    </div>
+                                                )}
                                             </button>
-                                        ))}
-                                    </div>
+                                        );
+                                    })}
+                                </div>
                                 </motion.div>
                             </motion.div>
                         )}
