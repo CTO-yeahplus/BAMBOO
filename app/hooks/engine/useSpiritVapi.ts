@@ -40,6 +40,7 @@ export function useSpiritVapi(
   const vapiRef = useRef<any>(vapi);
   const transcriptHistoryRef = useRef<{role: string, content: string}[]>([]);
   const isConnectingRef = useRef(false);
+  const [weather, setWeather] = useState<WeatherType>('clear');
   
   const { requestWakeLock, releaseWakeLock } = useWakeLock();
 
@@ -58,14 +59,15 @@ export function useSpiritVapi(
   }, []);
 
   const analyzeEmotion = useCallback((text: string) => {
-      if (!onEmotionDetected) return;
-      for (const [keyword, weather] of Object.entries(EMOTION_MAP)) {
-          if (text.includes(keyword)) {
-              onEmotionDetected(weather);
-              break; 
-          }
-      }
-  }, [onEmotionDetected]);
+    let detectedWeather: WeatherType = 'clear';
+    for (const [keyword, w] of Object.entries(EMOTION_MAP)) {
+        if (text.includes(keyword)) {
+            detectedWeather = w;
+            break; 
+        }
+    }
+    setWeather(detectedWeather);
+  }, []);
 
   useEffect(() => {
     const onCallStart = () => {
@@ -79,9 +81,10 @@ export function useSpiritVapi(
     const onCallEndHandler = () => { 
         console.log("📞 Call Ended");
         setCallStatus('idle'); 
+        setSpiritMessage("");
         isConnectingRef.current = false; 
         releaseWakeLock();
-        onCallEnd(transcriptHistoryRef.current); 
+        if (onCallEnd) onCallEnd(transcriptHistoryRef.current);        
     };
 
     const onSpeechStart = () => setCallStatus('listening');
@@ -101,21 +104,23 @@ export function useSpiritVapi(
       }
     };
 
-    vapi.on('call-start', onCallStart);
-    vapi.on('call-end', onCallEndHandler);
-    vapi.on('speech-start', onSpeechStart);
-    vapi.on('speech-end', onSpeechEnd);
-    vapi.on('message', onMessage);
-    
-    vapi.on('error', (e: any) => {
-        // setSinkId 에러는 무시하고, 그 외 에러만 처리
+    const onError = (e: any) => {
         const errMsg = e?.message || JSON.stringify(e);
         if (errMsg.includes('setSinkId')) return;
 
         console.error("Vapi Error:", e);
         setCallStatus('idle');
         isConnectingRef.current = false;
-    });
+        releaseWakeLock();
+    };
+
+    vapi.on('call-start', onCallStart);
+    vapi.on('call-end', onCallEndHandler);
+    vapi.on('speech-start', onSpeechStart);
+    vapi.on('speech-end', onSpeechEnd);
+    vapi.on('message', onMessage);
+    
+    vapi.on('error', onError);
 
     return () => { 
         vapi.off('call-start', onCallStart);
@@ -126,7 +131,7 @@ export function useSpiritVapi(
         vapi.off('error', () => {});
         releaseWakeLock();
     };
-  }, [onCallEnd, analyzeEmotion, requestWakeLock, releaseWakeLock]);
+  }, [onCallEnd, analyzeEmotion, requestWakeLock]);
 
   const stopVapi = useCallback(() => {
     console.log("🛑 Force Stopping Vapi...");

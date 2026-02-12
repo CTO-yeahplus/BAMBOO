@@ -85,14 +85,14 @@ export const PaymentModal = ({ isOpen, onClose, userName = "Traveler", userTier 
             id: 'plan_free',
             type: 'free',
             name: "Traveler",
-            sub: "The Beginning",
+            sub: "Start. 만남은 그 자체로 설렘입니다.",
             price: 0,
             coins: 5,
             features: [
-                { text: "매월 5분 무료 대화", icon: User },
-                { text: "기본 정령 목소리", icon: Mic },
-                { text: "최근 3일 기억 보존", icon: BookOpen },
-                { text: "기본 감정 달력 (2주)", icon: Calendar }
+                { text: "매달, 당신의 안부를 묻는 소중한 5분", icon: User,highlight: true },
+                { text: "만남의 시작, 맑고 투명한 정령의 음성", icon: Mic,highlight: true },
+                { text: "가장 생생한, 최근 3일간의 기억", icon: BookOpen,highlight: true },
+                { text: "지난 2주간의 감정 흐름을 담은 기록", icon: Calendar,highlight: true }
             ],
             color: "from-slate-500 to-gray-600",
             textColor: "text-gray-300",
@@ -102,14 +102,14 @@ export const PaymentModal = ({ isOpen, onClose, userName = "Traveler", userTier 
             id: 'sub_standard',
             type: 'subscription_standard',
             name: "Standard",
-            sub: "Forest Breeze",
+            sub: "Essential. 일상을 위로하기에, 충분합니다.",
             price: 9900,
             coins: 90,
             features: [
-                { text: "매월 90분 대화 제공", icon: Coins },
-                { text: "기본 정령 목소리 (Vapi)", icon: Mic }, 
-                { text: "감정 달력 & 기억 서재", icon: Calendar },
-                { text: "월간 심층 리포트", icon: FileText }
+                { text: "매일 당신의 하루를 듣기에 충분한 90분", icon: Coins,highlight: true },
+                { text: "마음을 편안하게 해주는 맑은 정령의 음성", icon: Mic,highlight: true }, 
+                { text: "그날의 감정과 기억이 머무는 서재", icon: Calendar, highlight: true },
+                { text: "한 달간의 당신을 깊이 이해하는 인사이트", icon: FileText,highlight: true }
             ],
             color: "from-teal-500 to-emerald-600",
             textColor: "text-emerald-100",
@@ -119,16 +119,16 @@ export const PaymentModal = ({ isOpen, onClose, userName = "Traveler", userTier 
             id: 'sub_premium',
             type: 'subscription_premium',
             name: "Premium",
-            sub: "Soul Resonance",
+            sub: "Emotional. 기술이 아니라, 당신의 위로가 되는 경험",
             price: 29900,
             coins: 90,
             features: [
-                { text: "매월 90분 대화 제공", icon: Coins, highlight: true },
-                { text: "모든 특수 페르소나 제공", icon: Crown, highlight: true }, 
-                { text: "11Labs 초고화질 음성대화 제공", icon: Sparkles, highlight: true },
-                { text: "깊은 몰입. 완전한 휴식. 뇌파 테라피 제공", icon: HeadsetIcon, highlight: true  },
-                { text: "우선 답변 & 영구 보존", icon: Star, highlight: true  },
-                { text: "모든 스탠다드 기능 포함", icon: Check }
+                { text: "매월 90분, 당신만을 위한 가장 깊은 대화", icon: Coins, highlight: true },
+                { text: "모든 페르소나. 상상하던 그 누군가와의 만남", icon: Crown, highlight: true }, 
+                { text: "숨소리마저 생생한 초고화질 보이스", icon: Sparkles, highlight: true },
+                { text: "완전한 휴식으로 안내하는 뇌파 테라피", icon: HeadsetIcon, highlight: true },
+                { text: "기다림 없는 우선 답변, 영원히 간직될 기억", icon: Star, highlight: true  },
+                { text: "물론, 스탠다드의 모든 경험을 포함합니다", icon: Check }
             ],
             color: "from-indigo-600 to-purple-700",
             textColor: "text-indigo-100",
@@ -138,14 +138,14 @@ export const PaymentModal = ({ isOpen, onClose, userName = "Traveler", userTier 
             id: 'refill_30',
             type: 'refill',
             name: "Refill",
-            sub: "Starlight Fragment",
+            sub: "Freedom. 당신의 속도에 맞춰 대화하세요",
             price: 9900,
             coins: 30,
             features: [
-                { text: "즉시 30분 충전", icon: Zap },
-                { text: "사라지지 않는 영구 소장", icon: Sparkles },
-                { text: "필요할 때 언제든 사용", icon: Check },
-                { text: "구독 없이도 구매 가능", icon: User }
+                { text: "가장 깊은 대화로 이끄는 30분의 에너지", icon: Zap,highlight: true },
+                { text: "유효기간 없이, 언제나 당신을 기다리는 시간", icon: Sparkles,highlight: true },
+                { text: "새벽이든 한낮이든, 당신이 필요로 하는 그 순간에", icon: Check,highlight: true },
+                { text: "구독의 부담 없이, 오직 대화만을 위한 선택", icon: User,highlight: true }
             ],
             color: "from-amber-500 to-orange-600",
             textColor: "text-amber-100",
@@ -166,7 +166,7 @@ export const PaymentModal = ({ isOpen, onClose, userName = "Traveler", userTier 
                                 className={`
                                     relative flex flex-col p-1 rounded-3xl transition-all w-full
                                     ${product.recommend 
-                                        ? 'ring-2 ring-indigo-400 shadow-[0_0_40px_rgba(99,102,241,0.3)] z-10 lg:-mt-4 lg:mb-4' 
+                                        ? 'ring-2 ring-indigo-400 shadow-[0_0_40px_rgba(99,102,241,0.3)] z-10 lg:-mt-2 lg:mb-4' 
                                         : 'border border-white/10 opacity-90 hover:opacity-100 hover:bg-white/5'}
                                 `}
                             >
@@ -196,7 +196,7 @@ export const PaymentModal = ({ isOpen, onClose, userName = "Traveler", userTier 
                                         
                                         <div className="flex items-baseline gap-1">
                                             <span className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-                                                {product.price === 0 ? "Free" : `₩${product.price.toLocaleString()}`}
+                                                {product.price === 0 ? "Free" : `₩ ${product.price.toLocaleString()}`}
                                             </span>
                                             {product.type.includes('subscription') && (
                                                 <span className="text-xs text-white/40 font-medium">/mo</span>

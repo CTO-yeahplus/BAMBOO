@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// 11Labs Voice ID 목록 (혹시 DB값이 이상할 때를 대비한 안전장치)
+// 11Labs Voice ID 목록
 const VOICES = {
-    DEFAULT: "cjVigAj5msChJcoj2", // 기본: 차분한 숲의 정령
-    // 여기에 다른 목소리 ID들을 나중에 추가해서 관리하면 편합니다
+    DEFAULT: "cjVigAj5msChJcoj2", 
 };
 
 export async function POST(req: Request) {
   try {
     const payload = await req.json();
 
+    // ----------------------------------------------------------------
+    // 1. 통화 시작 요청 (Assistant Configuration)
+    // ----------------------------------------------------------------
     if (payload.message.type === 'assistant-request') {
       const userId = payload.message.call?.metadata?.userId;
       
@@ -23,113 +25,188 @@ export async function POST(req: Request) {
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
 
-      // 🚀 병렬 처리: [프로필(유료여부+목소리)] + [기억]
       const [profileResult, memoryResult] = await Promise.allSettled([
-          // 👇 is_premium과 함께 'voice_id'도 가져옵니다!
           supabaseAdmin.from('profiles').select('is_premium, voice_id').eq('id', userId).single(),
           supabaseAdmin.from('memories').select('summary').eq('user_id', userId).order('created_at', { ascending: false }).limit(3)
       ]);
 
       const profile = profileResult.status === 'fulfilled' ? profileResult.value.data : null;
-      const isPremium = profile?.is_premium === true;
-      
-      // 🎤 [핵심] 유저가 설정한 목소리가 있으면 그거 쓰고, 없으면 기본값
-      const userSelectedVoiceId = profile?.voice_id || VOICES.DEFAULT;
-
       const memories = memoryResult.status === 'fulfilled' ? memoryResult.value.data : [];
-      const pastMemories = memories?.map((m: any) => `- ${m.summary}`).join('\n') || "아직 나눈 추억이 없습니다.";
+      
+      const memoryContext = memories && memories.length > 0
+          ? `[User's Recent Memories]\n${memories.map((m: any) => `- ${m.summary}`).join('\n')}`
+          : "";
 
-      // 설정 선택 (유저 목소리 ID 전달)
-      const selectedConfig = isPremium 
-          ? getPremiumConfig(userSelectedVoiceId) // 👈 유료회원은 선택한 목소리 적용
-          : getEconomyConfig();
-
-      return NextResponse.json({
-        assistant: {
-          ...selectedConfig,
-          model: {
-            ...selectedConfig.model,
-            systemPrompt: `
-              [System: Memory Access Active]
-              The user has spoken to you before. Here is the summary of past conversations:
-              ${pastMemories}
-              ${selectedConfig.model.systemPrompt}
-            `
-          }
-        }
-      });
+      if (profile?.is_premium) {
+          const voiceId = profile.voice_id || VOICES.DEFAULT;
+          return NextResponse.json({ 
+              assistant: getPremiumConfig(voiceId, memoryContext) 
+          });
+      } else {
+          return NextResponse.json({ 
+              assistant: getEconomyConfig(memoryContext) 
+          });
+      }
     }
 
-    // 2. [Call End] 통화 종료 및 기억 저장
+    // ----------------------------------------------------------------
+    // 2. 통화 종료 리포트 (Save to Memory with Emotion)
+    // ----------------------------------------------------------------
     if (payload.message.type === 'end-of-call-report') {
-      const userId = payload.message.call?.metadata?.userId;
-      const summary = payload.message.analysis?.summary;
+        const { analysis, artifact } = payload.message;
+        const userId = payload.message.call?.metadata?.userId;
 
-      if (userId && summary) {
+        console.log("📞 Call Ended. Processing Memory for User:", userId);
+
+        if (!userId || !analysis?.summary) {
+            console.log("⚠️ Skipping memory save: No userId or Summary provided.");
+            return NextResponse.json({});
+        }
+
+        // 🧠 감정 추출 로직 (Structured Data가 없으면 기본값 neutral)
+        // Vapi가 분석한 structuredData에서 emotion을 가져옵니다.
+        const extractedEmotion = analysis?.structuredData?.emotion || 'neutral';
+        
+        console.log(`🧠 Extracted Emotion: ${extractedEmotion}`);
+
         const supabaseAdmin = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
-        console.log(`[Vapi] Saving Memory: ${summary}`);
-        await supabaseAdmin.from('memories').insert({ user_id: userId, summary });
-      }
-      return NextResponse.json({});
+
+        const { error } = await supabaseAdmin.from('memories').insert({
+            user_id: userId,
+            summary: analysis.summary,
+            content: artifact?.transcript || "",
+            audio_url: artifact?.recordingUrl || "",
+            emotion: extractedEmotion, // ✨ 추출된 감정 저장
+            is_capsule: false,
+        });
+
+        if (error) {
+            console.error("❌ Failed to save memory:", error);
+        } else {
+            console.log("✅ Memory saved successfully with emotion.");
+        }
+
+        return NextResponse.json({});
     }
 
     return NextResponse.json({});
 
   } catch (error) {
-    console.error('[Vapi] Critical Route Error:', error);
+    console.error("Error in Vapi route:", error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
 
-// 💎 Premium Config (180분 + 목소리 선택 가능)
-// voiceId를 인자로 받도록 수정했습니다.
-function getPremiumConfig(voiceId: string) {
+// ----------------------------------------------------------------
+// Helper Functions (Config)
+// ----------------------------------------------------------------
+
+// 🧠 감정 분석 스키마 (Vapi에게 이 양식대로 분석하라고 지시)
+const EMOTION_SCHEMA = {
+    type: "object",
+    properties: {
+        emotion: {
+            type: "string",
+            description: "The dominant emotion of the user during the conversation.",
+            enum: ["happy", "sad", "neutral", "angry", "anxious", "calm", "excited", "tired"]
+        },
+        topic: {
+            type: "string",
+            description: "The main topic of the conversation."
+        }
+    },
+    required: ["emotion"]
+};
+
+// 💎 Premium Config
+function getPremiumConfig(voiceId: string, memoryContext: string) {
   return {
       firstMessage: "오랫동안 너를 기다렸어, 나의 수호자여. 오늘은 어떤 마음으로 숲을 찾아왔니?",
       silenceTimeoutSeconds: 600, 
-      
-      // ⏰ [시간 증가] 60분 -> 180분 (3시간 = 10800초)
       maxDurationSeconds: 10800,   
-      
       transcriber: { provider: "deepgram", model: "nova-2", language: "ko" },
       model: {
           provider: "openai",
-          // 유료니까 gpt-4o 권장하지만, 원하시면 gpt-4o-mini 유지 가능
-          model: "gpt-4o-mini", 
+          model: "gpt-4o", 
           temperature: 0.7,
-          systemPrompt: `You are the 'Spirit of the Bamboo Forest'. Speak in casual Korean (Banmal). Provide comfort.`
+          systemPrompt: `
+            You are the 'Spirit of the Bamboo Forest'. 
+            Speak in casual Korean (Banmal) with a calm, comforting tone.
+            Here is what you know about the user:
+            ${memoryContext}
+            Use this context to continue the conversation naturally.
+          `
       },
       voice: {
           provider: "11labs", 
-          // 👇 [적용] DB에서 가져온 목소리 ID를 여기에 넣습니다.
           voiceId: voiceId, 
           stability: 0.5,
           similarityBoost: 0.75
+      },
+      // ★ 분석 플랜 (요약 + 감정 추출)
+      analysisPlan: {
+          summaryPlan: {
+              enabled: true,
+              messages: [
+                  { role: "system", content: "You are an expert summarizer. Summarize the user's emotional state and key topics in Korean. Keep it concise." }
+              ]
+          },
+          // ✨ 감정 데이터 구조화 요청
+          structuredDataPlan: {
+              enabled: true,
+              schema: EMOTION_SCHEMA,
+              timeoutSeconds: 10 // 분석 제한 시간
+          },
+          recordingPlan: {
+            enabled: true
+          }
       }
   };
 }
 
-// 🍃 Economy Config (5분 + 기본 목소리)
-function getEconomyConfig() {
+// 🍃 Economy Config
+function getEconomyConfig(memoryContext: string = "") {
   return {
       firstMessage: "안녕, 숲에 온 걸 환영해. 잠시 쉬었다 갈래?",
-      silenceTimeoutSeconds: 300, 
-      maxDurationSeconds: 300, // 5분
+      silenceTimeoutSeconds: 300,
+      maxDurationSeconds: 300, 
       transcriber: { provider: "deepgram", model: "nova-2", language: "ko" },
       model: {
           provider: "openai",
           model: "gpt-4o-mini",
           temperature: 0.7,
-          systemPrompt: `You are the 'Spirit of the Bamboo Forest'. Speak in casual Korean (Banmal). Keep it short.`
+          systemPrompt: `
+            You are a friendly forest guide. Speak in casual Korean (Banmal).
+            ${memoryContext ? `Context: ${memoryContext}` : ""}
+          `
       },
       voice: {
-          provider: "openai", 
-          voiceId: "alloy", // 무료는 목소리 선택 불가 (고정)
-          speed: 1.0
+          provider: "11labs",
+          voiceId: "cjVigAj5msChJcoj2", 
+          stability: 0.5,
+          similarityBoost: 0.75
+      },
+      // ★ Economy도 감정 분석 수행
+      analysisPlan: {
+          summaryPlan: {
+              enabled: true,
+              messages: [
+                  { role: "system", content: "Summarize the conversation in Korean." }
+              ]
+          },
+          // ✨ 감정 데이터 구조화 요청
+          structuredDataPlan: {
+              enabled: true,
+              schema: EMOTION_SCHEMA,
+              timeoutSeconds: 5
+          },
+          recordingPlan: {
+            enabled: true
+          }
       }
   };
 }

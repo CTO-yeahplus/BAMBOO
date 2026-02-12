@@ -2,47 +2,23 @@
 import React, { useState } from 'react';
 import { ModalOverlay } from './ModalOverlay';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Wind, Leaf, Check, Smile, Lock, User, Music } from 'lucide-react'; // 아이콘 추가
+import { Sparkles, Wind, Leaf, Check, Smile, Lock, Crown, X } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { UserTier } from '../../types';
 
-// 🔒 Premium 전용 보이스 ID 목록 (기존 4개 모두 포함)
+// 🔒 Premium 전용 보이스 ID 목록
 const PREMIUM_VOICE_IDS = [
-    'cjVigAj5msChJcoj2',      // Deep Forest
-    'wMrz30qBeYiSkAtnZGtn',   // Warm Breeze
-    'IAETYMYM3nJvjnlkVTKI',   // Mystic Star
-    'PLfpgtLkFW07fDYbUiRJ'    // Bong Pal
+    'PLfpgtLkFW07fDYbUiRJ', // Bong Pal
+     'IAETYMYM3nJvjnlkVTKI', // Mystic Star (필요 시 주석 해제하여 잠금)
+     'wMrz30qBeYiSkAtnZGtn',
+
 ];
 
-// 🎭 페르소나 데이터 (기본 2종 + 프리미엄 4종)
 const PERSONAS = [
-    // 👇 1. [New] 기본 남성 음성
-    {
-        id: 'basic_male_01', 
-        name: 'Silent Guardian',
-        desc: '차분하고 든든한 숲의 수호자',
-        message: '"걱정 마세요. 제가 곁에서 지키고 있겠습니다."',
-        color: 'from-slate-600 to-gray-700',
-        textColor: 'text-gray-100',
-        icon: User,
-        imageUrl: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?q=80&w=600&auto=format&fit=crop' // 차분한 자연 풍경 or 남성적 이미지
-    },
-    // 👇 2. [New] 기본 여성 음성
-    {
-        id: 'basic_female_01', 
-        name: 'Gentle Whisper',
-        desc: '상냥하고 부드러운 바람의 속삭임',
-        message: '"당신의 이야기에 귀 기울이고 있어요."',
-        color: 'from-rose-400 to-pink-500',
-        textColor: 'text-pink-100',
-        icon: Music,
-        imageUrl: 'https://images.unsplash.com/photo-1516575150278-77136aed6920?q=80&w=600&auto=format&fit=crop' // 부드러운 꽃/자연 이미지
-    },
-    // 👇 3. Premium 음성들 (이제 잠금 처리됨)
     {
         id: 'cjVigAj5msChJcoj2', 
         name: 'Deep Forest',
-        desc: '깊고 고요한 숲의 지혜 (Premium)',
+        desc: '깊고 고요한 숲의 지혜',
         message: '"모든 잎사귀가 잠든 밤... 당신의 이야기를 듣습니다."',
         color: 'from-emerald-600 to-teal-800',
         textColor: 'text-emerald-100',
@@ -52,7 +28,7 @@ const PERSONAS = [
     {
         id: 'wMrz30qBeYiSkAtnZGtn', 
         name: 'Warm Breeze',
-        desc: '봄날의 햇살 같은 다정함 (Premium)',
+        desc: '봄날의 햇살 같은 다정함',
         message: '"괜찮아요. 바람이 당신의 눈물을 닦아줄 거예요."',
         color: 'from-amber-500 to-orange-600',
         textColor: 'text-amber-100',
@@ -62,7 +38,7 @@ const PERSONAS = [
     {
         id: 'IAETYMYM3nJvjnlkVTKI', 
         name: 'Mystic Star',
-        desc: '밤하늘 너머의 신비로움 (Premium)',
+        desc: '밤하늘 너머의 신비로움',
         message: '"우리는 모두 별의 조각입니다. 빛을 잃지 마세요."',
         color: 'from-indigo-600 to-purple-800',
         textColor: 'text-indigo-100',
@@ -72,7 +48,7 @@ const PERSONAS = [
     {
         id: 'PLfpgtLkFW07fDYbUiRJ', 
         name: 'Bong Pal',
-        desc: '유쾌하고 구수한 옛날 이야기 (Premium)',
+        desc: '유쾌하고 구수한 옛날 이야기',
         message: '"허허, 왔는가! 어디 한번 재미난 이야기 좀 해보세."',
         color: 'from-yellow-700 to-amber-900',
         textColor: 'text-amber-100',
@@ -92,24 +68,23 @@ interface VoiceSelectorProps {
     userId: string;
     currentVoiceId: string;
     onSelect: (id: string) => void;
-    userTier: UserTier;
-    onOpenShop?: () => void;
+    //isPremium: boolean;
+    userTier: UserTier; // 👈 [New] 유저 등급
+    onOpenShop?: () => void; // 👈 [New] 잠긴 항목 클릭 시 상점 열기
 }
 
 export const VoiceSelectorModal = ({ isOpen, onClose, userId, currentVoiceId, onSelect, userTier, onOpenShop }: VoiceSelectorProps) => {
     const [justSelected, setJustSelected] = useState<string | null>(null);
+    const [lockedSelection, setLockedSelection] = useState<typeof PERSONAS[0] | null>(null);
 
     if (!isOpen) return null;
 
     const handleSelect = async (persona: any) => {
-        // 🔒 잠금 로직: Premium ID 목록에 있고, 유저가 Premium이 아니면 차단
+        // 🔒 잠금 로직 확인
         const isLocked = PREMIUM_VOICE_IDS.includes(persona.id) && userTier !== 'premium';
         
         if (isLocked) {
-            if (confirm(`'${persona.name}' is a Premium voice.\nWould you like to upgrade to unlock?`)) {
-                onClose();
-                if (onOpenShop) onOpenShop();
-            }
+            setLockedSelection(persona);
             return;
         }
 
@@ -123,10 +98,16 @@ export const VoiceSelectorModal = ({ isOpen, onClose, userId, currentVoiceId, on
             onClose();
         }, 2500);
     };
+    const handleUpgrade = () => {
+        setLockedSelection(null);
+        onClose();
+        if (onOpenShop) onOpenShop();
+    };
 
     return (
         <ModalOverlay onClose={onClose} title="Soul Resonance" subtitle="Choose the voice that echoes within you">
             <div className="p-4 md:p-6 relative min-h-[450px] flex flex-col justify-center">
+                
                 <AnimatePresence mode="wait">
                     {justSelected ? (
                         <motion.div
@@ -152,6 +133,7 @@ export const VoiceSelectorModal = ({ isOpen, onClose, userId, currentVoiceId, on
                         >
                             {PERSONAS.map((persona) => {
                                 const isSelected = currentVoiceId === persona.id;
+                                // 🔒 잠금 여부 계산
                                 const isLocked = PREMIUM_VOICE_IDS.includes(persona.id) && userTier !== 'premium';
                                 const Icon = isLocked ? Lock : persona.icon;
 
@@ -169,16 +151,21 @@ export const VoiceSelectorModal = ({ isOpen, onClose, userId, currentVoiceId, on
                                                 : 'border-white/10 hover:border-white/30'}
                                         `}
                                     >
+                                        {/* 1. 배경 이미지 (잠겨있으면 흑백 처리) */}
                                         <img 
                                             src={persona.imageUrl} 
                                             alt={persona.name}
                                             className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${isLocked ? 'grayscale opacity-50' : ''}`}
                                         />
+                                        
+                                        {/* 2. 오버레이 */}
                                         <div className={`absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-colors duration-300`} />
                                         <div className={`absolute inset-0 bg-gradient-to-t ${persona.color} opacity-40 mix-blend-multiply`} />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
+                                        {/* 4. 컨텐츠 */}
                                         <div className="absolute inset-0 p-4 flex flex-col justify-end items-start z-10">
+                                            {/* 상단 아이콘 */}
                                             <div className="absolute top-3 right-3">
                                                 {isSelected ? (
                                                     <div className="bg-amber-400 rounded-full p-1.5 shadow-lg">
@@ -191,6 +178,7 @@ export const VoiceSelectorModal = ({ isOpen, onClose, userId, currentVoiceId, on
                                                 )}
                                             </div>
 
+                                            {/* 텍스트 정보 */}
                                             <h4 className={`font-serif text-lg md:text-xl font-medium tracking-wide drop-shadow-md ${isLocked ? 'text-white/60' : 'text-white'}`}>
                                                 {persona.name}
                                             </h4>
@@ -204,6 +192,84 @@ export const VoiceSelectorModal = ({ isOpen, onClose, userId, currentVoiceId, on
                         </motion.div>
                     )}
                 </AnimatePresence>
+                {/* ✨ Premium Unlock Overlay (고급스런 구독 유도) */}
+                <AnimatePresence>
+                    {lockedSelection && (
+                        <motion.div
+                            initial={{ opacity: 0, y: '100%' }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: '100%' }}
+                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                            className="absolute inset-0 z-50 flex flex-col"
+                        >
+                            {/* Background Backdrop with Blur */}
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-xl" />
+                            
+                            {/* Content Layer */}
+                            <div className="relative z-10 w-full h-full flex flex-col">
+                                {/* Image Area (Top) */}
+                                <div className="relative h-[55%] w-full overflow-hidden">
+                                    <img 
+                                        src={lockedSelection.imageUrl} 
+                                        alt={lockedSelection.name}
+                                        className="w-full h-full object-cover"
+                                    />
+                                    <div className={`absolute inset-0 bg-gradient-to-t ${lockedSelection.color} opacity-60 mix-blend-multiply`} />
+                                    <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-[#0A0A0A]" />
+                                    
+                                    <button 
+                                        onClick={() => setLockedSelection(null)}
+                                        className="absolute top-6 right-6 p-2 rounded-full bg-black/20 text-white/80 hover:bg-black/40 backdrop-blur-md transition-all"
+                                    >
+                                        <X size={24} />
+                                    </button>
+                                </div>
+
+                                {/* Details Area (Bottom) */}
+                                <div className="flex-1 bg-[#0A0A0A] px-8 pb-10 pt-4 flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <span className="px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                                <Crown size={12} /> Premium Only
+                                            </span>
+                                        </div>
+                                        <h3 className="text-3xl md:text-4xl font-serif text-white mb-3">
+                                            {lockedSelection.name}
+                                        </h3>
+                                        <p className="text-white/60 text-sm md:text-base font-light leading-relaxed mb-6 italic">
+                                            {lockedSelection.message}
+                                        </p>
+                                        <div className="flex items-center gap-3 text-sm text-white/40">
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                11Labs High-Fidelity
+                                            </div>
+                                            <div className="w-1 h-1 rounded-full bg-white/20" />
+                                            <div>Deep Immersion</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col gap-3 mt-6">
+                                        <button 
+                                            onClick={handleUpgrade}
+                                            className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-200 to-amber-400 text-black font-bold text-lg hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(251,191,36,0.3)]"
+                                        >
+                                            <Sparkles size={18} />
+                                            Unlock Experience
+                                        </button>
+                                        <button 
+                                            onClick={() => setLockedSelection(null)}
+                                            className="w-full py-3 text-white/40 hover:text-white text-sm transition-colors"
+                                        >
+                                            Maybe later
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
             </div>
         </ModalOverlay>
     );
