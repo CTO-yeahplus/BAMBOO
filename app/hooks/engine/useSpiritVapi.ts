@@ -51,6 +51,11 @@ export function useSpiritVapi(
         // SDK 내부의 setSinkId 오류는 기능상 문제없으므로 로그에서 숨김
         if (typeof args[0] === 'string' && args[0].includes('setSinkId failed')) return;
         if (args[0] && args[0].message && args[0].message.includes('setSinkId failed')) return;
+        // 2) [NEW] 추가 필터: Chrome 동기 XHR 경고 무시
+        // Daily.js 내부에서 발생하는 deprecation 경고를 숨깁니다.
+        if (typeof args[0] === 'string' && args[0].includes('XMLHttpRequestSynchronousInNonWorkerOutsideBeforeUnload')) return;
+        if (args[0]?.message?.includes('XMLHttpRequestSynchronousInNonWorkerOutsideBeforeUnload')) return;
+        
         originalError.apply(console, args);
     };
     return () => {

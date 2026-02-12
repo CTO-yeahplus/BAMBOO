@@ -295,11 +295,11 @@ export default function BambooForest() {
                         <div className="relative group">
                             <div className="absolute inset-0 bg-emerald-500/10 rounded-full blur-[40px] animate-pulse group-hover:bg-emerald-500/20 transition-all duration-1000" />
                             <button className="relative w-24 h-24 rounded-full bg-gradient-to-b from-white/5 to-transparent border border-white/10 flex items-center justify-center backdrop-blur-sm shadow-[0_0_30px_rgba(255,255,255,0.05)] group-hover:scale-105 transition-transform duration-700">
-                                <Mic className="w-8 h-8 text-white/60 group-hover:text-white transition-colors duration-500" />
+                                <Moon className="w-8 h-8 text-white/60 group-hover:text-white transition-colors duration-500" />
                             </button>
                         </div>
                         <p className="text-white/30 text-xs font-light tracking-[0.3em] uppercase animate-pulse">
-                            Touch to Whisper
+                            Touch to Enter
                         </p>
                     </motion.div>
                 </motion.div>
@@ -383,7 +383,23 @@ export default function BambooForest() {
                         <button onClick={engine.signInWithGoogle} className="group flex items-center gap-3 px-8 py-4 bg-white/90 hover:bg-white text-black font-medium rounded-full shadow-[0_0_40px_rgba(255,255,255,0.1)] transition-all active:scale-95"><span className="tracking-widest text-xs uppercase">Begin your journey</span></button>
                     </motion.div>
                 ) : (
-                    <motion.button initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }} onClick={engine.toggleCall} className="px-12 py-6 text-sm font-medium text-white bg-white/10 border border-white/20 rounded-full backdrop-blur-xl shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-white/20 transition-all tracking-widest cursor-pointer pointer-events-auto">숲으로 입장하기</motion.button>
+                    <motion.button
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={engine.toggleCall}
+                        // group 클래스를 추가하여 내부 요소들이 호버 상태를 감지하도록 합니다.
+                        className="relative group w-24 h-24 rounded-full bg-gradient-to-b from-white/5 to-transparent border border-white/10 flex items-center justify-center backdrop-blur-sm shadow-[0_0_30px_rgba(255,255,255,0.05)] cursor-pointer pointer-events-auto transition-all duration-700"
+                    >
+                        {/* Glow Effect (배경 효과) */}
+                        <div className="absolute inset-0 bg-emerald-500/10 rounded-full blur-[40px] animate-pulse group-hover:bg-emerald-500/20 transition-all duration-1000" />
+                        
+                        {/* Icon (내부 아이콘) */}
+                        <Mic className="w-8 h-8 text-white/60 group-hover:text-white transition-colors duration-500 relative z-10" />
+                        
+                    </motion.button>
+                    
                 )
               ) : engine.callStatus !== 'idle' ? (
                 <motion.div key="active-status" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-6 pointer-events-auto">

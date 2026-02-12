@@ -30,7 +30,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL('https://bamboo-forest.vercel.app'),
   title: "Bamboo Forest | 마음의 쉼터",
-  description: "지친 당신을 위한 AI 대나무 숲. 정령과 대화하며 마음을 치유하세요.",
+  description: "지친 당신을 위한 AI 대나무 숲. 정령과 비밀스런 대화하며 마음을 치유하세요.",
   manifest: "/manifest.json", // PWA 연결
   icons: {
     icon: "/icons/icon-192x192.png",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "대나무 숲에 오신 것을 환영합니다",
-    description: "아무도 모르는 깊은 숲속, 당신의 이야기를 들어줄 정령이 기다립니다.",
+    description: "아무도 모르는 깊은 숲속, 당신만의 이야기를 들어줄 정령이 기다립니다.",
     url: "https://bamboo-forest.vercel.app", // 배포된 실제 URL
     siteName: "Bamboo Forest",
     images: [
@@ -55,7 +55,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Bamboo Forest | 마음의 쉼터",
-    description: "정령과의 대화로 오늘 하루를 위로받으세요.",
+    description: "당신만의 비밀 대화로 오늘 하루를 위로받으세요.",
     images: ["/og-image.png"],
   },
   appleWebApp: {
